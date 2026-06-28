@@ -1,52 +1,18 @@
 //! Native connector ABI for Iceberg.
 //!
-//! Connector behavior is declared in ../connector.config.json and
-//! ../irodori.extension.json so packaging can customize metadata without
-//! changing Rust code.
+//! Generated extension entrypoints stay small: `abi` owns buffer/JSON ABI
+//! mechanics, and `stub` owns connector behavior.
 
-const ABI_VERSION: u32 = 1;
-const ENGINE: &str = "iceberg";
-const CONFIG_JSON: &str = include_str!("../connector.config.json");
-const MANIFEST_JSON: &str = include_str!("../irodori.extension.json");
-const HEALTH_RESPONSE_JSON: &str =
-    r#"{"ok":true,"engine":"iceberg","abiVersion":1,"driverLinked":false}"#;
-const DESCRIBE_RESPONSE_JSON: &str = concat!(
-    r#"{"ok":true,"engine":"iceberg","abiVersion":1,"driverLinked":false,"manifest":"#,
-    include_str!("../irodori.extension.json"),
-    r#","config":"#,
-    include_str!("../connector.config.json"),
-    r#"}"#
-);
-const INVALID_REQUEST_RESPONSE_JSON: &str = r#"{"ok":false,"error":{"code":"connector.invalidRequest","message":"Connector request buffer must be empty or valid UTF-8 JSON."}}"#;
-const NOT_LINKED_RESPONSE_JSON: &str = r#"{"ok":false,"error":{"code":"connector.driverNotLinked","message":"The native connector metadata is available, but the engine-specific driver entrypoint is not linked in this package yet."}}"#;
+mod abi;
+mod stub;
 
-#[repr(C)]
-#[derive(Clone, Copy)]
-pub struct IrodoriConnectorBuffer {
-    pub ptr: *const u8,
-    pub len: usize,
-}
+pub use abi::IrodoriConnectorBuffer;
 
-fn static_buffer(value: &'static str) -> IrodoriConnectorBuffer {
-    IrodoriConnectorBuffer {
-        ptr: value.as_ptr(),
-        len: value.len(),
-    }
-}
-
-fn buffer_to_string(buffer: IrodoriConnectorBuffer) -> Result<String, ()> {
-    if buffer.ptr.is_null() {
-        return if buffer.len == 0 {
-            Ok(String::new())
-        } else {
-            Err(())
-        };
-    }
-    let bytes = unsafe { std::slice::from_raw_parts(buffer.ptr, buffer.len) };
-    std::str::from_utf8(bytes)
-        .map(str::to_owned)
-        .map_err(|_| ())
-}
+pub const ABI_VERSION: u32 = 1;
+pub const ENGINE: &str = "iceberg";
+pub const DRIVER_LINKED: bool = false;
+pub const CONFIG_JSON: &str = include_str!("../connector.config.json");
+pub const MANIFEST_JSON: &str = include_str!("../irodori.extension.json");
 
 #[no_mangle]
 pub extern "C" fn irodori_extension_abi_version() -> u32 {
@@ -55,49 +21,35 @@ pub extern "C" fn irodori_extension_abi_version() -> u32 {
 
 #[no_mangle]
 pub extern "C" fn irodori_connector_engine_json() -> IrodoriConnectorBuffer {
-    static_buffer(ENGINE)
+    abi::owned_buffer(ENGINE.to_string())
 }
 
 #[no_mangle]
 pub extern "C" fn irodori_extension_manifest_json() -> IrodoriConnectorBuffer {
-    static_buffer(MANIFEST_JSON)
+    abi::owned_buffer(MANIFEST_JSON.to_string())
 }
 
 #[no_mangle]
 pub extern "C" fn irodori_connector_config_json() -> IrodoriConnectorBuffer {
-    static_buffer(CONFIG_JSON)
+    abi::owned_buffer(CONFIG_JSON.to_string())
 }
 
 #[no_mangle]
 pub extern "C" fn irodori_connector_call_json(
     request: IrodoriConnectorBuffer,
 ) -> IrodoriConnectorBuffer {
-    let Ok(request) = buffer_to_string(request) else {
-        return static_buffer(INVALID_REQUEST_RESPONSE_JSON);
-    };
-    if request.trim().is_empty() || request.contains(r#""health""#) || request.contains(r#""ping""#)
-    {
-        return static_buffer(HEALTH_RESPONSE_JSON);
-    }
-    if request.contains(r#""describe""#) || request.contains(r#""capabilities""#) {
-        return static_buffer(DESCRIBE_RESPONSE_JSON);
-    }
-    if request.contains(r#""manifest""#) {
-        return static_buffer(MANIFEST_JSON);
-    }
-    if request.contains(r#""config""#) {
-        return static_buffer(CONFIG_JSON);
-    }
-    static_buffer(NOT_LINKED_RESPONSE_JSON)
+    stub::call_json(request)
 }
 
 #[no_mangle]
-pub extern "C" fn irodori_connector_free_buffer(_buffer: IrodoriConnectorBuffer) {}
+pub extern "C" fn irodori_connector_free_buffer(buffer: IrodoriConnectorBuffer) {
+    abi::free_owned_buffer(buffer);
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::Value;
+    use serde_json::{json, Value};
 
     fn buffer_from_str(value: &'static str) -> IrodoriConnectorBuffer {
         IrodoriConnectorBuffer {
@@ -113,9 +65,22 @@ mod tests {
         }
     }
 
+    fn buffer_to_string(buffer: IrodoriConnectorBuffer) -> String {
+        let bytes = unsafe { std::slice::from_raw_parts(buffer.ptr, buffer.len) };
+        let value = std::str::from_utf8(bytes).unwrap().to_string();
+        irodori_connector_free_buffer(buffer);
+        value
+    }
+
     fn buffer_to_json(buffer: IrodoriConnectorBuffer) -> Value {
         let bytes = unsafe { std::slice::from_raw_parts(buffer.ptr, buffer.len) };
-        serde_json::from_slice(bytes).unwrap()
+        let value = serde_json::from_slice(bytes).unwrap();
+        irodori_connector_free_buffer(buffer);
+        value
+    }
+
+    fn call(request: &'static str) -> Value {
+        buffer_to_json(irodori_connector_call_json(buffer_from_str(request)))
     }
 
     #[test]
@@ -129,6 +94,7 @@ mod tests {
         assert_eq!(connector["engine"], config["connector"]["engine"]);
         assert_eq!(connector["module"], config["connector"]["module"]);
         assert_eq!(connector["connection"], config["connection"]);
+        assert_eq!(config["runtime"]["driverLinked"], json!(false));
         assert!(config["connection"]["authMethods"]
             .as_array()
             .is_some_and(|methods| !methods.is_empty()));
@@ -141,26 +107,29 @@ mod tests {
     }
 
     #[test]
-    fn abi_exports_static_json() {
+    fn abi_exports_owned_json() {
         assert_eq!(irodori_extension_abi_version(), ABI_VERSION);
-        assert!(irodori_extension_manifest_json().len > 0);
-        assert!(irodori_connector_config_json().len > 0);
-        assert_eq!(irodori_connector_engine_json().len, ENGINE.len());
+        assert_eq!(buffer_to_string(irodori_connector_engine_json()), ENGINE);
+        assert_eq!(
+            buffer_to_string(irodori_extension_manifest_json()),
+            MANIFEST_JSON
+        );
+        assert_eq!(
+            buffer_to_string(irodori_connector_config_json()),
+            CONFIG_JSON
+        );
     }
 
     #[test]
     fn call_json_reports_health_and_describes_metadata() {
-        let health = buffer_to_json(irodori_connector_call_json(buffer_from_str(
-            r#"{"method":"health"}"#,
-        )));
+        let health = call(r#"{"method":"health"}"#);
         assert_eq!(health["ok"], true);
         assert_eq!(health["engine"], ENGINE);
-        assert_eq!(health["driverLinked"], false);
+        assert_eq!(health["driverLinked"], json!(false));
 
-        let describe = buffer_to_json(irodori_connector_call_json(buffer_from_str(
-            r#"{"method":"describe"}"#,
-        )));
+        let describe = call(r#"{"method":"describe"}"#);
         assert_eq!(describe["ok"], true);
+        assert_eq!(describe["driverLinked"], json!(false));
         assert_eq!(
             describe["manifest"]["id"],
             describe["config"]["extensionId"]
@@ -170,9 +139,7 @@ mod tests {
 
     #[test]
     fn call_json_rejects_driver_operations_until_linked() {
-        let response = buffer_to_json(irodori_connector_call_json(buffer_from_str(
-            r#"{"method":"query","sql":"select 1"}"#,
-        )));
+        let response = call(r#"{"method":"query","sql":"select 1"}"#);
         assert_eq!(response["ok"], false);
         assert_eq!(response["error"]["code"], "connector.driverNotLinked");
     }
@@ -184,6 +151,10 @@ mod tests {
         ])));
         assert_eq!(invalid_utf8["ok"], false);
         assert_eq!(invalid_utf8["error"]["code"], "connector.invalidRequest");
+
+        let invalid_json = call("{");
+        assert_eq!(invalid_json["ok"], false);
+        assert_eq!(invalid_json["error"]["code"], "connector.invalidJson");
 
         let invalid_null = buffer_to_json(irodori_connector_call_json(IrodoriConnectorBuffer {
             ptr: std::ptr::null(),

@@ -10,8 +10,7 @@ publish = false
 name = "irodori_extension_iceberg"
 crate-type = ["cdylib", "rlib"]
 
-
-[dev-dependencies]
+[dependencies]
 serde_json = "1"
 
 [profile.dev.package."*"]

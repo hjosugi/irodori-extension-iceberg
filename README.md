@@ -13,10 +13,10 @@ This connector is listed in the public Irodori extension marketplace.
 - Native ABI: `irodori.connector.native.v1`
 - Driver linked: `false`
 
-No desktop adapter source exists yet; this package starts from the ABI shim and connector metadata.
+No desktop adapter source exists yet; this package starts from the refactored ABI shim and connector metadata.
 
 Connector metadata lives in `connector.config.json` and `irodori.extension.json`.
-The Rust code exports the native ABI plus self-description calls. Engine-specific connect/query/metadata behavior should be linked behind `irodori_connector_call_json`.
+The Rust code keeps native ABI exports in `src/lib.rs`, shared buffer/JSON helpers in `src/abi.rs`, and metadata-only behavior in `src/stub.rs` until the engine driver is linked.
 
 ## Connection Metadata
 
@@ -56,7 +56,7 @@ Driver operations such as `connect`, `query`, and `metadata` intentionally retur
 ## Development
 
 
-Generated extension repositories share `../target` across sibling repositories so Rust dependencies are compiled once per checkout. Driver-linked DuckDB scaffolds are opt-in: run the scaffold with `IRODORI_CONNECTOR_LINK_DUCKDB=1` or `IRODORI_CONNECTOR_LINKED_DRIVERS=duckdb,motherduck` only when you need the local DuckDB driver.
+Generated extension repositories share `../target` across sibling repositories so Rust dependencies are compiled once per checkout. DuckDB and MotherDuck are driver-linked by default; set `IRODORI_CONNECTOR_LINK_DUCKDB=0` only when you need metadata-only DuckDB-compatible scaffolds.
 
 
 ```sh
