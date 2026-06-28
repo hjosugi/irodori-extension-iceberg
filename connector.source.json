@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 1,
+  "extensionId": "irodori.iceberg",
+  "visibility": "public",
+  "version": "0.1.0",
+  "connector": {
+    "id": "iceberg.connector",
+    "engine": "iceberg",
+    "label": "Iceberg",
+    "aliases": [
+      "iceberg",
+      "Apache Iceberg",
+      "Iceberg"
+    ],
+    "defaultPort": 443,
+    "wire": "lakehouse",
+    "module": "iceberg.driver",
+    "features": [
+      "metadata",
+      "sql"
+    ]
+  },
+  "connection": {
+    "endpoint": {
+      "modes": [
+        "catalog",
+        "objectStorage",
+        "jdbc",
+        "connectionString"
+      ],
+      "defaultPort": 443,
+      "fields": [
+        {
+          "id": "catalogUri",
+          "label": "Catalog URI",
+          "type": "uri",
+          "option": "catalogUri"
+        },
+        {
+          "id": "warehouse",
+          "label": "Warehouse path",
+          "type": "string",
+          "option": "warehouse"
+        }
+      ]
+    },
+    "authMethods": [
+      "none",
+      "connectionString",
+      "awsSigV4",
+      "awsProfile",
+      "oauth2",
+      "catalogBearerToken",
+      "catalogPassword",
+      "serviceAccountJson",
+      "azureAd",
+      "sasToken",
+      "customDriverOptions"
+    ],
+    "tls": "required",
+    "transports": "default",
+    "optionNamespaces": [
+      "lakehouse",
+      "iceberg",
+      "aws",
+      "catalog",
+      "objectStorage"
+    ],
+    "customDriverOptions": true
+  },
+  "runtime": {
+    "driverLinked": false
+  },
+  "source": {
+    "knowledgeEngineStatus": "recognized_no_connector",
+    "adapter": null
+  }
+}
