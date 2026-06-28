@@ -56,7 +56,7 @@ Driver operations such as `connect`, `query`, and `metadata` intentionally retur
 ## Development
 
 
-Generated extension repositories share `../target` across sibling repositories so Rust dependencies are compiled once per checkout.
+Generated extension repositories share `../target` across sibling repositories so Rust dependencies are compiled once per checkout. Driver-linked DuckDB scaffolds are opt-in: run the scaffold with `IRODORI_CONNECTOR_LINK_DUCKDB=1` or `IRODORI_CONNECTOR_LINKED_DRIVERS=duckdb,motherduck` only when you need the local DuckDB driver.
 
 
 ```sh

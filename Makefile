@@ -1,9 +1,13 @@
 CARGO ?= cargo
 CARGO_TARGET_DIR ?= ../target
+CARGO_BUILD_JOBS ?= 2
+export CARGO_TARGET_DIR
+export CARGO_BUILD_JOBS
 
 .PHONY: build check fmt lint test package clean
 
 check: fmt lint test
+
 
 fmt:
 	$(CARGO) fmt --check
