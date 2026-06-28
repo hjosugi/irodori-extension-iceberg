@@ -1,0 +1,4 @@
+/target
+/.irodori-dev
+dist/native/*
+!dist/native/.gitkeep

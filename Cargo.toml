@@ -1,0 +1,16 @@
+[package]
+name = "irodori-extension-iceberg"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR 0BSD"
+description = "Irodori Table native connector extension."
+publish = false
+
+[lib]
+name = "irodori_extension_iceberg"
+crate-type = ["cdylib", "rlib"]
+
+
+[dev-dependencies]
+serde_json = "1"
+

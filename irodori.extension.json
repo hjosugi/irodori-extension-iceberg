@@ -1,0 +1,442 @@
+{
+  "$schema": "https://irodori.dev/schemas/irodori.extension.schema.json",
+  "manifestVersion": 1,
+  "id": "irodori.iceberg",
+  "name": "Iceberg Connector",
+  "version": "0.1.0",
+  "publisher": "irodori",
+  "description": "Iceberg Connector contributes the Iceberg database connector through the native connector ABI.",
+  "license": "MIT OR 0BSD",
+  "repository": "https://github.com/hjosugi/irodori-extension-iceberg",
+  "apiVersion": "0.1",
+  "runtime": "native",
+  "entry": "dist/native",
+  "permissions": [
+    "connections:read",
+    "connections:write",
+    "queries:run",
+    "metadata:read",
+    "native",
+    "connectors"
+  ],
+  "contributes": {
+    "connectors": [
+      {
+        "id": "iceberg.connector",
+        "engine": "iceberg",
+        "label": "Iceberg",
+        "aliases": [
+          "iceberg",
+          "Apache Iceberg",
+          "Iceberg"
+        ],
+        "defaultPort": 443,
+        "wire": "lakehouse",
+        "module": "iceberg.driver",
+        "features": [
+          "metadata",
+          "sql"
+        ],
+        "connection": {
+          "schemaVersion": 1,
+          "inferEnvironmentFrom": [
+            "name",
+            "id",
+            "host",
+            "database",
+            "url"
+          ],
+          "compatibility": {
+            "addsRequiredProfileFields": false,
+            "acceptsExistingProfiles": true
+          },
+          "defaults": {
+            "engine": "iceberg",
+            "wire": "lakehouse",
+            "port": 443,
+            "readOnly": false
+          },
+          "endpoint": {
+            "modes": [
+              "catalog",
+              "objectStorage",
+              "jdbc",
+              "connectionString"
+            ],
+            "defaultPort": 443,
+            "fields": [
+              {
+                "id": "catalogUri",
+                "label": "Catalog URI",
+                "type": "uri",
+                "option": "catalogUri"
+              },
+              {
+                "id": "warehouse",
+                "label": "Warehouse path",
+                "type": "string",
+                "option": "warehouse"
+              }
+            ]
+          },
+          "profileFields": [
+            {
+              "id": "id",
+              "label": "Connection ID",
+              "type": "string",
+              "profileField": "id",
+              "required": true
+            },
+            {
+              "id": "url",
+              "label": "Connection URL or DSN",
+              "type": "uri",
+              "profileField": "url"
+            },
+            {
+              "id": "user",
+              "label": "User",
+              "type": "string",
+              "profileField": "user"
+            },
+            {
+              "id": "catalogUri",
+              "label": "Catalog URI",
+              "type": "uri",
+              "option": "catalogUri"
+            },
+            {
+              "id": "warehouse",
+              "label": "Warehouse path",
+              "type": "string",
+              "option": "warehouse"
+            },
+            {
+              "id": "readOnly",
+              "label": "Read-only connection",
+              "type": "boolean",
+              "profileField": "readOnly",
+              "default": false
+            },
+            {
+              "id": "options",
+              "label": "Driver options",
+              "type": "map",
+              "profileField": "options"
+            }
+          ],
+          "authMethods": [
+            {
+              "id": "none",
+              "label": "No authentication",
+              "kind": "none",
+              "secretPurposes": [],
+              "fields": []
+            },
+            {
+              "id": "connectionString",
+              "label": "Connection string / DSN",
+              "kind": "connectionString",
+              "secretPurposes": [],
+              "fields": [
+                {
+                  "id": "url",
+                  "label": "Connection URL or DSN",
+                  "type": "uri",
+                  "profileField": "url",
+                  "required": true
+                }
+              ]
+            },
+            {
+              "id": "awsSigV4",
+              "label": "AWS SigV4",
+              "kind": "iam",
+              "secretPurposes": [
+                "token"
+              ],
+              "fields": [
+                {
+                  "id": "accessKeyId",
+                  "label": "Access key ID",
+                  "type": "string"
+                },
+                {
+                  "id": "secretAccessKey",
+                  "label": "Secret access key",
+                  "type": "secret",
+                  "secretPurpose": "token"
+                },
+                {
+                  "id": "sessionToken",
+                  "label": "Session token",
+                  "type": "secret",
+                  "secretPurpose": "token"
+                },
+                {
+                  "id": "region",
+                  "label": "Region",
+                  "type": "string",
+                  "option": "region"
+                }
+              ]
+            },
+            {
+              "id": "awsProfile",
+              "label": "AWS shared config profile",
+              "kind": "iam",
+              "secretPurposes": [],
+              "fields": [
+                {
+                  "id": "profile",
+                  "label": "Profile",
+                  "type": "string",
+                  "option": "awsProfile"
+                },
+                {
+                  "id": "region",
+                  "label": "Region",
+                  "type": "string",
+                  "option": "region"
+                }
+              ]
+            },
+            {
+              "id": "oauth2",
+              "label": "OAuth 2.0",
+              "kind": "oauth2",
+              "secretPurposes": [
+                "token"
+              ],
+              "fields": [
+                {
+                  "id": "accessToken",
+                  "label": "Access token",
+                  "type": "secret",
+                  "secretPurpose": "token"
+                },
+                {
+                  "id": "refreshToken",
+                  "label": "Refresh token",
+                  "type": "secret",
+                  "secretPurpose": "token"
+                },
+                {
+                  "id": "clientId",
+                  "label": "Client ID",
+                  "type": "string"
+                },
+                {
+                  "id": "clientSecret",
+                  "label": "Client secret",
+                  "type": "secret",
+                  "secretPurpose": "token"
+                }
+              ]
+            },
+            {
+              "id": "catalogBearerToken",
+              "label": "Catalog bearer token",
+              "kind": "token",
+              "secretPurposes": [
+                "token"
+              ],
+              "fields": [
+                {
+                  "id": "token",
+                  "label": "Token",
+                  "type": "secret",
+                  "secretPurpose": "token"
+                }
+              ]
+            },
+            {
+              "id": "catalogPassword",
+              "label": "Catalog user/password",
+              "kind": "userPassword",
+              "secretPurposes": [
+                "password"
+              ],
+              "fields": [
+                {
+                  "id": "user",
+                  "label": "User",
+                  "type": "string",
+                  "profileField": "user"
+                },
+                {
+                  "id": "password",
+                  "label": "Password",
+                  "type": "secret",
+                  "secretPurpose": "password",
+                  "profileField": "password"
+                }
+              ]
+            },
+            {
+              "id": "serviceAccountJson",
+              "label": "Service account JSON",
+              "kind": "serviceAccount",
+              "secretPurposes": [
+                "privateKey"
+              ],
+              "fields": [
+                {
+                  "id": "serviceAccountJson",
+                  "label": "Service account JSON",
+                  "type": "json",
+                  "secretPurpose": "privateKey"
+                }
+              ]
+            },
+            {
+              "id": "azureAd",
+              "label": "Azure AD / Entra ID",
+              "kind": "azureAd",
+              "secretPurposes": [
+                "token"
+              ],
+              "fields": [
+                {
+                  "id": "tenantId",
+                  "label": "Tenant ID",
+                  "type": "string"
+                },
+                {
+                  "id": "clientId",
+                  "label": "Client ID",
+                  "type": "string"
+                },
+                {
+                  "id": "clientSecret",
+                  "label": "Client secret",
+                  "type": "secret",
+                  "secretPurpose": "token"
+                },
+                {
+                  "id": "accessToken",
+                  "label": "Access token",
+                  "type": "secret",
+                  "secretPurpose": "token"
+                }
+              ]
+            },
+            {
+              "id": "sasToken",
+              "label": "SAS token",
+              "kind": "token",
+              "secretPurposes": [
+                "token"
+              ],
+              "fields": [
+                {
+                  "id": "sasToken",
+                  "label": "SAS token",
+                  "type": "secret",
+                  "secretPurpose": "token"
+                }
+              ]
+            },
+            {
+              "id": "customDriverOptions",
+              "label": "Custom driver options",
+              "kind": "custom",
+              "secretPurposes": [
+                "password",
+                "token",
+                "privateKey",
+                "privateKeyPassphrase"
+              ],
+              "fields": [
+                {
+                  "id": "options",
+                  "label": "Driver options",
+                  "type": "map",
+                  "profileField": "options"
+                }
+              ]
+            }
+          ],
+          "secretPurposes": [
+            "token",
+            "password",
+            "privateKey",
+            "privateKeyPassphrase"
+          ],
+          "tls": {
+            "supported": true,
+            "requiredByDefault": true,
+            "modes": [
+              "disable",
+              "prefer",
+              "require",
+              "verifyCa",
+              "verifyFull",
+              "clientCertificate"
+            ],
+            "fields": [
+              {
+                "id": "caCertificate",
+                "label": "CA certificate",
+                "type": "pem"
+              },
+              {
+                "id": "clientCertificate",
+                "label": "Client certificate",
+                "type": "pem"
+              },
+              {
+                "id": "clientPrivateKey",
+                "label": "Client private key",
+                "type": "pem",
+                "secretPurpose": "privateKey"
+              }
+            ]
+          },
+          "transports": [
+            "direct",
+            "sshTunnel",
+            "socks5Proxy",
+            "httpConnectProxy",
+            "proxyChain"
+          ],
+          "optionNamespaces": [
+            "profile.options",
+            "driver",
+            "tls",
+            "network",
+            "lakehouse",
+            "iceberg",
+            "aws",
+            "catalog",
+            "objectStorage"
+          ],
+          "customDriverOptions": true
+        }
+      }
+    ]
+  },
+  "capabilities": {
+    "nativeModules": [
+      {
+        "id": "iceberg.driver",
+        "path": "dist/native",
+        "platforms": [
+          "windowsX64",
+          "windowsArm64",
+          "macosX64",
+          "macosArm64",
+          "linuxX64",
+          "linuxArm64"
+        ]
+      }
+    ]
+  },
+  "dev": {
+    "watch": [
+      "src",
+      "connector.config.json",
+      "irodori.extension.json"
+    ]
+  }
+}

@@ -1,0 +1,892 @@
+{
+  "schemaVersion": 1,
+  "visibility": "public",
+  "extensionId": "irodori.iceberg",
+  "connector": {
+    "id": "iceberg.connector",
+    "engine": "iceberg",
+    "label": "Iceberg",
+    "aliases": [
+      "iceberg",
+      "Apache Iceberg",
+      "Iceberg"
+    ],
+    "defaultPort": 443,
+    "wire": "lakehouse",
+    "module": "iceberg.driver",
+    "features": [
+      "metadata",
+      "sql"
+    ],
+    "connection": {
+      "schemaVersion": 1,
+      "inferEnvironmentFrom": [
+        "name",
+        "id",
+        "host",
+        "database",
+        "url"
+      ],
+      "compatibility": {
+        "addsRequiredProfileFields": false,
+        "acceptsExistingProfiles": true
+      },
+      "defaults": {
+        "engine": "iceberg",
+        "wire": "lakehouse",
+        "port": 443,
+        "readOnly": false
+      },
+      "endpoint": {
+        "modes": [
+          "catalog",
+          "objectStorage",
+          "jdbc",
+          "connectionString"
+        ],
+        "defaultPort": 443,
+        "fields": [
+          {
+            "id": "catalogUri",
+            "label": "Catalog URI",
+            "type": "uri",
+            "option": "catalogUri"
+          },
+          {
+            "id": "warehouse",
+            "label": "Warehouse path",
+            "type": "string",
+            "option": "warehouse"
+          }
+        ]
+      },
+      "profileFields": [
+        {
+          "id": "id",
+          "label": "Connection ID",
+          "type": "string",
+          "profileField": "id",
+          "required": true
+        },
+        {
+          "id": "url",
+          "label": "Connection URL or DSN",
+          "type": "uri",
+          "profileField": "url"
+        },
+        {
+          "id": "user",
+          "label": "User",
+          "type": "string",
+          "profileField": "user"
+        },
+        {
+          "id": "catalogUri",
+          "label": "Catalog URI",
+          "type": "uri",
+          "option": "catalogUri"
+        },
+        {
+          "id": "warehouse",
+          "label": "Warehouse path",
+          "type": "string",
+          "option": "warehouse"
+        },
+        {
+          "id": "readOnly",
+          "label": "Read-only connection",
+          "type": "boolean",
+          "profileField": "readOnly",
+          "default": false
+        },
+        {
+          "id": "options",
+          "label": "Driver options",
+          "type": "map",
+          "profileField": "options"
+        }
+      ],
+      "authMethods": [
+        {
+          "id": "none",
+          "label": "No authentication",
+          "kind": "none",
+          "secretPurposes": [],
+          "fields": []
+        },
+        {
+          "id": "connectionString",
+          "label": "Connection string / DSN",
+          "kind": "connectionString",
+          "secretPurposes": [],
+          "fields": [
+            {
+              "id": "url",
+              "label": "Connection URL or DSN",
+              "type": "uri",
+              "profileField": "url",
+              "required": true
+            }
+          ]
+        },
+        {
+          "id": "awsSigV4",
+          "label": "AWS SigV4",
+          "kind": "iam",
+          "secretPurposes": [
+            "token"
+          ],
+          "fields": [
+            {
+              "id": "accessKeyId",
+              "label": "Access key ID",
+              "type": "string"
+            },
+            {
+              "id": "secretAccessKey",
+              "label": "Secret access key",
+              "type": "secret",
+              "secretPurpose": "token"
+            },
+            {
+              "id": "sessionToken",
+              "label": "Session token",
+              "type": "secret",
+              "secretPurpose": "token"
+            },
+            {
+              "id": "region",
+              "label": "Region",
+              "type": "string",
+              "option": "region"
+            }
+          ]
+        },
+        {
+          "id": "awsProfile",
+          "label": "AWS shared config profile",
+          "kind": "iam",
+          "secretPurposes": [],
+          "fields": [
+            {
+              "id": "profile",
+              "label": "Profile",
+              "type": "string",
+              "option": "awsProfile"
+            },
+            {
+              "id": "region",
+              "label": "Region",
+              "type": "string",
+              "option": "region"
+            }
+          ]
+        },
+        {
+          "id": "oauth2",
+          "label": "OAuth 2.0",
+          "kind": "oauth2",
+          "secretPurposes": [
+            "token"
+          ],
+          "fields": [
+            {
+              "id": "accessToken",
+              "label": "Access token",
+              "type": "secret",
+              "secretPurpose": "token"
+            },
+            {
+              "id": "refreshToken",
+              "label": "Refresh token",
+              "type": "secret",
+              "secretPurpose": "token"
+            },
+            {
+              "id": "clientId",
+              "label": "Client ID",
+              "type": "string"
+            },
+            {
+              "id": "clientSecret",
+              "label": "Client secret",
+              "type": "secret",
+              "secretPurpose": "token"
+            }
+          ]
+        },
+        {
+          "id": "catalogBearerToken",
+          "label": "Catalog bearer token",
+          "kind": "token",
+          "secretPurposes": [
+            "token"
+          ],
+          "fields": [
+            {
+              "id": "token",
+              "label": "Token",
+              "type": "secret",
+              "secretPurpose": "token"
+            }
+          ]
+        },
+        {
+          "id": "catalogPassword",
+          "label": "Catalog user/password",
+          "kind": "userPassword",
+          "secretPurposes": [
+            "password"
+          ],
+          "fields": [
+            {
+              "id": "user",
+              "label": "User",
+              "type": "string",
+              "profileField": "user"
+            },
+            {
+              "id": "password",
+              "label": "Password",
+              "type": "secret",
+              "secretPurpose": "password",
+              "profileField": "password"
+            }
+          ]
+        },
+        {
+          "id": "serviceAccountJson",
+          "label": "Service account JSON",
+          "kind": "serviceAccount",
+          "secretPurposes": [
+            "privateKey"
+          ],
+          "fields": [
+            {
+              "id": "serviceAccountJson",
+              "label": "Service account JSON",
+              "type": "json",
+              "secretPurpose": "privateKey"
+            }
+          ]
+        },
+        {
+          "id": "azureAd",
+          "label": "Azure AD / Entra ID",
+          "kind": "azureAd",
+          "secretPurposes": [
+            "token"
+          ],
+          "fields": [
+            {
+              "id": "tenantId",
+              "label": "Tenant ID",
+              "type": "string"
+            },
+            {
+              "id": "clientId",
+              "label": "Client ID",
+              "type": "string"
+            },
+            {
+              "id": "clientSecret",
+              "label": "Client secret",
+              "type": "secret",
+              "secretPurpose": "token"
+            },
+            {
+              "id": "accessToken",
+              "label": "Access token",
+              "type": "secret",
+              "secretPurpose": "token"
+            }
+          ]
+        },
+        {
+          "id": "sasToken",
+          "label": "SAS token",
+          "kind": "token",
+          "secretPurposes": [
+            "token"
+          ],
+          "fields": [
+            {
+              "id": "sasToken",
+              "label": "SAS token",
+              "type": "secret",
+              "secretPurpose": "token"
+            }
+          ]
+        },
+        {
+          "id": "customDriverOptions",
+          "label": "Custom driver options",
+          "kind": "custom",
+          "secretPurposes": [
+            "password",
+            "token",
+            "privateKey",
+            "privateKeyPassphrase"
+          ],
+          "fields": [
+            {
+              "id": "options",
+              "label": "Driver options",
+              "type": "map",
+              "profileField": "options"
+            }
+          ]
+        }
+      ],
+      "secretPurposes": [
+        "token",
+        "password",
+        "privateKey",
+        "privateKeyPassphrase"
+      ],
+      "tls": {
+        "supported": true,
+        "requiredByDefault": true,
+        "modes": [
+          "disable",
+          "prefer",
+          "require",
+          "verifyCa",
+          "verifyFull",
+          "clientCertificate"
+        ],
+        "fields": [
+          {
+            "id": "caCertificate",
+            "label": "CA certificate",
+            "type": "pem"
+          },
+          {
+            "id": "clientCertificate",
+            "label": "Client certificate",
+            "type": "pem"
+          },
+          {
+            "id": "clientPrivateKey",
+            "label": "Client private key",
+            "type": "pem",
+            "secretPurpose": "privateKey"
+          }
+        ]
+      },
+      "transports": [
+        "direct",
+        "sshTunnel",
+        "socks5Proxy",
+        "httpConnectProxy",
+        "proxyChain"
+      ],
+      "optionNamespaces": [
+        "profile.options",
+        "driver",
+        "tls",
+        "network",
+        "lakehouse",
+        "iceberg",
+        "aws",
+        "catalog",
+        "objectStorage"
+      ],
+      "customDriverOptions": true
+    }
+  },
+  "runtime": {
+    "abi": "irodori.connector.native.v1",
+    "module": {
+      "id": "iceberg.driver",
+      "path": "dist/native",
+      "platforms": [
+        "windowsX64",
+        "windowsArm64",
+        "macosX64",
+        "macosArm64",
+        "linuxX64",
+        "linuxArm64"
+      ]
+    },
+    "crate": "irodori_extension_iceberg",
+    "entrypoints": [
+      "irodori_extension_abi_version",
+      "irodori_connector_engine_json",
+      "irodori_extension_manifest_json",
+      "irodori_connector_config_json",
+      "irodori_connector_call_json",
+      "irodori_connector_free_buffer"
+    ],
+    "supportedCalls": [
+      "health",
+      "describe",
+      "manifest",
+      "config"
+    ],
+    "driverLinked": false
+  },
+  "source": {
+    "marketplaceId": "irodori.iceberg",
+    "repository": "https://github.com/hjosugi/irodori-extension-iceberg",
+    "knowledgeEngineStatus": "recognized_no_connector",
+    "adapter": null,
+    "adapterSha256": null,
+    "snapshots": [
+      {
+        "kind": "desktop-db-contract",
+        "path": "apps/desktop/src-tauri/src/db/connection.rs",
+        "destination": "native/source/irodori-table/apps/desktop/src-tauri/src/db/connection.rs",
+        "sha256": "54051346e0402f182d87e2f0e7692d8fc50a8cedd7e1ba4b02b2abfa1f514a47"
+      },
+      {
+        "kind": "desktop-db-contract",
+        "path": "apps/desktop/src-tauri/src/db/profile.rs",
+        "destination": "native/source/irodori-table/apps/desktop/src-tauri/src/db/profile.rs",
+        "sha256": "6ea079bd8fd74f687e0a549cbc3b3e97009fa5f529839831a79b8e4d69999446"
+      },
+      {
+        "kind": "desktop-db-contract",
+        "path": "apps/desktop/src-tauri/src/db/transport.rs",
+        "destination": "native/source/irodori-table/apps/desktop/src-tauri/src/db/transport.rs",
+        "sha256": "bcc16c52a19739b0706fd83143ae089ae91310af963885c1c75b5ba955e85add"
+      },
+      {
+        "kind": "desktop-db-contract",
+        "path": "apps/desktop/src-tauri/src/db/query.rs",
+        "destination": "native/source/irodori-table/apps/desktop/src-tauri/src/db/query.rs",
+        "sha256": "ca2605bf1645da61edf8195408717c682593fd552faf4e246a44a53f2bde665e"
+      },
+      {
+        "kind": "desktop-db-contract",
+        "path": "apps/desktop/src-tauri/src/db/meta.rs",
+        "destination": "native/source/irodori-table/apps/desktop/src-tauri/src/db/meta.rs",
+        "sha256": "de99fe0155f450c0fd9a439bee52cd7f66b7bc5174db500e00c8293360706be7"
+      },
+      {
+        "kind": "desktop-db-contract",
+        "path": "apps/desktop/src-tauri/src/db/explain.rs",
+        "destination": "native/source/irodori-table/apps/desktop/src-tauri/src/db/explain.rs",
+        "sha256": "a741b485e3bb4702634c02fd9d673f6e82680777118b56d9ffcbb1d40e6aec20"
+      },
+      {
+        "kind": "portable-connection-contract",
+        "path": "crates/irodori-connection/src/lib.rs",
+        "destination": "native/source/irodori-table/crates/irodori-connection/src/lib.rs",
+        "sha256": "05197e61760bf2afe02efd33380328e10c5730601c3003ff356f7579eb2c23d6"
+      },
+      {
+        "kind": "portable-connection-contract",
+        "path": "crates/irodori-connection/src/portable.rs",
+        "destination": "native/source/irodori-table/crates/irodori-connection/src/portable.rs",
+        "sha256": "ab45663fa9a101b66af686bfb45404c2c475e82578842f3f18af024ad5c9fbe8"
+      },
+      {
+        "kind": "secure-store-contract",
+        "path": "crates/irodori-secure-store/src/lib.rs",
+        "destination": "native/source/irodori-table/crates/irodori-secure-store/src/lib.rs",
+        "sha256": "85fb8b001936ba9090da8a4e3197d61bc54d833689d71efa1d0aeb99b91bdb9f"
+      },
+      {
+        "kind": "transport-contract",
+        "path": "crates/irodori-core/src/lib.rs",
+        "destination": "native/source/irodori-table/crates/irodori-core/src/lib.rs",
+        "sha256": "c356aaa20dd6fdaf71aae8b08febcf2cafbbe53bfda60e276bb71f57fc281510"
+      },
+      {
+        "kind": "transport-runtime",
+        "path": "crates/irodori-proxy/src/lib.rs",
+        "destination": "native/source/irodori-table/crates/irodori-proxy/src/lib.rs",
+        "sha256": "b07f7e81df3703e04688a541b07a4c65ec968d6117f8028a07f479a2d066dfba"
+      },
+      {
+        "kind": "transport-runtime",
+        "path": "crates/irodori-proxy/src/plan.rs",
+        "destination": "native/source/irodori-table/crates/irodori-proxy/src/plan.rs",
+        "sha256": "b6e3be9778fd9b543d905dec39c0ddf579e739313e0bf24881f6152b6da94a39"
+      },
+      {
+        "kind": "transport-runtime",
+        "path": "crates/irodori-proxy/src/resolved.rs",
+        "destination": "native/source/irodori-table/crates/irodori-proxy/src/resolved.rs",
+        "sha256": "4b1ba3f95e49fd582dd82de39452d03a597abe36a8738772e6f4bdbab753772d"
+      }
+    ]
+  },
+  "connection": {
+    "schemaVersion": 1,
+    "inferEnvironmentFrom": [
+      "name",
+      "id",
+      "host",
+      "database",
+      "url"
+    ],
+    "compatibility": {
+      "addsRequiredProfileFields": false,
+      "acceptsExistingProfiles": true
+    },
+    "defaults": {
+      "engine": "iceberg",
+      "wire": "lakehouse",
+      "port": 443,
+      "readOnly": false
+    },
+    "endpoint": {
+      "modes": [
+        "catalog",
+        "objectStorage",
+        "jdbc",
+        "connectionString"
+      ],
+      "defaultPort": 443,
+      "fields": [
+        {
+          "id": "catalogUri",
+          "label": "Catalog URI",
+          "type": "uri",
+          "option": "catalogUri"
+        },
+        {
+          "id": "warehouse",
+          "label": "Warehouse path",
+          "type": "string",
+          "option": "warehouse"
+        }
+      ]
+    },
+    "profileFields": [
+      {
+        "id": "id",
+        "label": "Connection ID",
+        "type": "string",
+        "profileField": "id",
+        "required": true
+      },
+      {
+        "id": "url",
+        "label": "Connection URL or DSN",
+        "type": "uri",
+        "profileField": "url"
+      },
+      {
+        "id": "user",
+        "label": "User",
+        "type": "string",
+        "profileField": "user"
+      },
+      {
+        "id": "catalogUri",
+        "label": "Catalog URI",
+        "type": "uri",
+        "option": "catalogUri"
+      },
+      {
+        "id": "warehouse",
+        "label": "Warehouse path",
+        "type": "string",
+        "option": "warehouse"
+      },
+      {
+        "id": "readOnly",
+        "label": "Read-only connection",
+        "type": "boolean",
+        "profileField": "readOnly",
+        "default": false
+      },
+      {
+        "id": "options",
+        "label": "Driver options",
+        "type": "map",
+        "profileField": "options"
+      }
+    ],
+    "authMethods": [
+      {
+        "id": "none",
+        "label": "No authentication",
+        "kind": "none",
+        "secretPurposes": [],
+        "fields": []
+      },
+      {
+        "id": "connectionString",
+        "label": "Connection string / DSN",
+        "kind": "connectionString",
+        "secretPurposes": [],
+        "fields": [
+          {
+            "id": "url",
+            "label": "Connection URL or DSN",
+            "type": "uri",
+            "profileField": "url",
+            "required": true
+          }
+        ]
+      },
+      {
+        "id": "awsSigV4",
+        "label": "AWS SigV4",
+        "kind": "iam",
+        "secretPurposes": [
+          "token"
+        ],
+        "fields": [
+          {
+            "id": "accessKeyId",
+            "label": "Access key ID",
+            "type": "string"
+          },
+          {
+            "id": "secretAccessKey",
+            "label": "Secret access key",
+            "type": "secret",
+            "secretPurpose": "token"
+          },
+          {
+            "id": "sessionToken",
+            "label": "Session token",
+            "type": "secret",
+            "secretPurpose": "token"
+          },
+          {
+            "id": "region",
+            "label": "Region",
+            "type": "string",
+            "option": "region"
+          }
+        ]
+      },
+      {
+        "id": "awsProfile",
+        "label": "AWS shared config profile",
+        "kind": "iam",
+        "secretPurposes": [],
+        "fields": [
+          {
+            "id": "profile",
+            "label": "Profile",
+            "type": "string",
+            "option": "awsProfile"
+          },
+          {
+            "id": "region",
+            "label": "Region",
+            "type": "string",
+            "option": "region"
+          }
+        ]
+      },
+      {
+        "id": "oauth2",
+        "label": "OAuth 2.0",
+        "kind": "oauth2",
+        "secretPurposes": [
+          "token"
+        ],
+        "fields": [
+          {
+            "id": "accessToken",
+            "label": "Access token",
+            "type": "secret",
+            "secretPurpose": "token"
+          },
+          {
+            "id": "refreshToken",
+            "label": "Refresh token",
+            "type": "secret",
+            "secretPurpose": "token"
+          },
+          {
+            "id": "clientId",
+            "label": "Client ID",
+            "type": "string"
+          },
+          {
+            "id": "clientSecret",
+            "label": "Client secret",
+            "type": "secret",
+            "secretPurpose": "token"
+          }
+        ]
+      },
+      {
+        "id": "catalogBearerToken",
+        "label": "Catalog bearer token",
+        "kind": "token",
+        "secretPurposes": [
+          "token"
+        ],
+        "fields": [
+          {
+            "id": "token",
+            "label": "Token",
+            "type": "secret",
+            "secretPurpose": "token"
+          }
+        ]
+      },
+      {
+        "id": "catalogPassword",
+        "label": "Catalog user/password",
+        "kind": "userPassword",
+        "secretPurposes": [
+          "password"
+        ],
+        "fields": [
+          {
+            "id": "user",
+            "label": "User",
+            "type": "string",
+            "profileField": "user"
+          },
+          {
+            "id": "password",
+            "label": "Password",
+            "type": "secret",
+            "secretPurpose": "password",
+            "profileField": "password"
+          }
+        ]
+      },
+      {
+        "id": "serviceAccountJson",
+        "label": "Service account JSON",
+        "kind": "serviceAccount",
+        "secretPurposes": [
+          "privateKey"
+        ],
+        "fields": [
+          {
+            "id": "serviceAccountJson",
+            "label": "Service account JSON",
+            "type": "json",
+            "secretPurpose": "privateKey"
+          }
+        ]
+      },
+      {
+        "id": "azureAd",
+        "label": "Azure AD / Entra ID",
+        "kind": "azureAd",
+        "secretPurposes": [
+          "token"
+        ],
+        "fields": [
+          {
+            "id": "tenantId",
+            "label": "Tenant ID",
+            "type": "string"
+          },
+          {
+            "id": "clientId",
+            "label": "Client ID",
+            "type": "string"
+          },
+          {
+            "id": "clientSecret",
+            "label": "Client secret",
+            "type": "secret",
+            "secretPurpose": "token"
+          },
+          {
+            "id": "accessToken",
+            "label": "Access token",
+            "type": "secret",
+            "secretPurpose": "token"
+          }
+        ]
+      },
+      {
+        "id": "sasToken",
+        "label": "SAS token",
+        "kind": "token",
+        "secretPurposes": [
+          "token"
+        ],
+        "fields": [
+          {
+            "id": "sasToken",
+            "label": "SAS token",
+            "type": "secret",
+            "secretPurpose": "token"
+          }
+        ]
+      },
+      {
+        "id": "customDriverOptions",
+        "label": "Custom driver options",
+        "kind": "custom",
+        "secretPurposes": [
+          "password",
+          "token",
+          "privateKey",
+          "privateKeyPassphrase"
+        ],
+        "fields": [
+          {
+            "id": "options",
+            "label": "Driver options",
+            "type": "map",
+            "profileField": "options"
+          }
+        ]
+      }
+    ],
+    "secretPurposes": [
+      "token",
+      "password",
+      "privateKey",
+      "privateKeyPassphrase"
+    ],
+    "tls": {
+      "supported": true,
+      "requiredByDefault": true,
+      "modes": [
+        "disable",
+        "prefer",
+        "require",
+        "verifyCa",
+        "verifyFull",
+        "clientCertificate"
+      ],
+      "fields": [
+        {
+          "id": "caCertificate",
+          "label": "CA certificate",
+          "type": "pem"
+        },
+        {
+          "id": "clientCertificate",
+          "label": "Client certificate",
+          "type": "pem"
+        },
+        {
+          "id": "clientPrivateKey",
+          "label": "Client private key",
+          "type": "pem",
+          "secretPurpose": "privateKey"
+        }
+      ]
+    },
+    "transports": [
+      "direct",
+      "sshTunnel",
+      "socks5Proxy",
+      "httpConnectProxy",
+      "proxyChain"
+    ],
+    "optionNamespaces": [
+      "profile.options",
+      "driver",
+      "tls",
+      "network",
+      "lakehouse",
+      "iceberg",
+      "aws",
+      "catalog",
+      "objectStorage"
+    ],
+    "customDriverOptions": true
+  }
+}
