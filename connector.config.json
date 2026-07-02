@@ -47,6 +47,14 @@
         "defaultPort": 443,
         "fields": [
           {
+            "id": "catalogType",
+            "label": "Catalog type",
+            "type": "string",
+            "option": "catalogType",
+            "default": "rest",
+            "required": true
+          },
+          {
             "id": "catalogUri",
             "label": "Catalog URI",
             "type": "uri",
@@ -57,6 +65,32 @@
             "label": "Warehouse path",
             "type": "string",
             "option": "warehouse"
+          },
+          {
+            "id": "tableIdentifier",
+            "label": "Table identifier",
+            "type": "string",
+            "option": "tableIdentifier"
+          },
+          {
+            "id": "storageBackend",
+            "label": "Storage backend",
+            "type": "string",
+            "option": "storageBackend",
+            "default": "objectStorage"
+          },
+          {
+            "id": "region",
+            "label": "Cloud region",
+            "type": "string",
+            "option": "region"
+          },
+          {
+            "id": "credentialVending",
+            "label": "Credential vending",
+            "type": "boolean",
+            "option": "credentialVending",
+            "default": false
           }
         ]
       },
@@ -81,6 +115,14 @@
           "profileField": "user"
         },
         {
+          "id": "catalogType",
+          "label": "Catalog type",
+          "type": "string",
+          "option": "catalogType",
+          "default": "rest",
+          "required": true
+        },
+        {
           "id": "catalogUri",
           "label": "Catalog URI",
           "type": "uri",
@@ -91,6 +133,32 @@
           "label": "Warehouse path",
           "type": "string",
           "option": "warehouse"
+        },
+        {
+          "id": "tableIdentifier",
+          "label": "Table identifier",
+          "type": "string",
+          "option": "tableIdentifier"
+        },
+        {
+          "id": "storageBackend",
+          "label": "Storage backend",
+          "type": "string",
+          "option": "storageBackend",
+          "default": "objectStorage"
+        },
+        {
+          "id": "region",
+          "label": "Cloud region",
+          "type": "string",
+          "option": "region"
+        },
+        {
+          "id": "credentialVending",
+          "label": "Credential vending",
+          "type": "boolean",
+          "option": "credentialVending",
+          "default": false
         },
         {
           "id": "readOnly",
@@ -443,7 +511,7 @@
         "kind": "desktop-db-contract",
         "path": "apps/desktop/src-tauri/src/db/profile.rs",
         "destination": "native/source/irodori-table/apps/desktop/src-tauri/src/db/profile.rs",
-        "sha256": "6ea079bd8fd74f687e0a549cbc3b3e97009fa5f529839831a79b8e4d69999446"
+        "sha256": "a4ac432937eb051c4b3434751b5153b33974b8294a3521745ed021da377c458f"
       },
       {
         "kind": "desktop-db-contract",
@@ -471,44 +539,44 @@
       },
       {
         "kind": "portable-connection-contract",
-        "path": "crates/irodori-connection/src/lib.rs",
-        "destination": "native/source/irodori-table/crates/irodori-connection/src/lib.rs",
+        "path": "../irodori-kit/irodori-connection/src/lib.rs",
+        "destination": "native/source/irodori-table/../irodori-kit/irodori-connection/src/lib.rs",
         "sha256": "05197e61760bf2afe02efd33380328e10c5730601c3003ff356f7579eb2c23d6"
       },
       {
         "kind": "portable-connection-contract",
-        "path": "crates/irodori-connection/src/portable.rs",
-        "destination": "native/source/irodori-table/crates/irodori-connection/src/portable.rs",
+        "path": "../irodori-kit/irodori-connection/src/portable.rs",
+        "destination": "native/source/irodori-table/../irodori-kit/irodori-connection/src/portable.rs",
         "sha256": "ab45663fa9a101b66af686bfb45404c2c475e82578842f3f18af024ad5c9fbe8"
       },
       {
         "kind": "secure-store-contract",
-        "path": "crates/irodori-secure-store/src/lib.rs",
-        "destination": "native/source/irodori-table/crates/irodori-secure-store/src/lib.rs",
+        "path": "../irodori-kit/irodori-secure-store/src/lib.rs",
+        "destination": "native/source/irodori-table/../irodori-kit/irodori-secure-store/src/lib.rs",
         "sha256": "85fb8b001936ba9090da8a4e3197d61bc54d833689d71efa1d0aeb99b91bdb9f"
       },
       {
         "kind": "transport-contract",
-        "path": "crates/irodori-core/src/lib.rs",
-        "destination": "native/source/irodori-table/crates/irodori-core/src/lib.rs",
+        "path": "../irodori-kit/irodori-core/src/lib.rs",
+        "destination": "native/source/irodori-table/../irodori-kit/irodori-core/src/lib.rs",
         "sha256": "c356aaa20dd6fdaf71aae8b08febcf2cafbbe53bfda60e276bb71f57fc281510"
       },
       {
         "kind": "transport-runtime",
-        "path": "crates/irodori-proxy/src/lib.rs",
-        "destination": "native/source/irodori-table/crates/irodori-proxy/src/lib.rs",
-        "sha256": "b07f7e81df3703e04688a541b07a4c65ec968d6117f8028a07f479a2d066dfba"
+        "path": "../irodori-kit/irodori-proxy/src/lib.rs",
+        "destination": "native/source/irodori-table/../irodori-kit/irodori-proxy/src/lib.rs",
+        "sha256": "4ff9e90f61f69aa2f7a8c663b0a13e1b0f0c283b166d608a2a0a6613cd03f126"
       },
       {
         "kind": "transport-runtime",
-        "path": "crates/irodori-proxy/src/plan.rs",
-        "destination": "native/source/irodori-table/crates/irodori-proxy/src/plan.rs",
+        "path": "../irodori-kit/irodori-proxy/src/plan.rs",
+        "destination": "native/source/irodori-table/../irodori-kit/irodori-proxy/src/plan.rs",
         "sha256": "b6e3be9778fd9b543d905dec39c0ddf579e739313e0bf24881f6152b6da94a39"
       },
       {
         "kind": "transport-runtime",
-        "path": "crates/irodori-proxy/src/resolved.rs",
-        "destination": "native/source/irodori-table/crates/irodori-proxy/src/resolved.rs",
+        "path": "../irodori-kit/irodori-proxy/src/resolved.rs",
+        "destination": "native/source/irodori-table/../irodori-kit/irodori-proxy/src/resolved.rs",
         "sha256": "4b1ba3f95e49fd582dd82de39452d03a597abe36a8738772e6f4bdbab753772d"
       }
     ]
@@ -542,6 +610,14 @@
       "defaultPort": 443,
       "fields": [
         {
+          "id": "catalogType",
+          "label": "Catalog type",
+          "type": "string",
+          "option": "catalogType",
+          "default": "rest",
+          "required": true
+        },
+        {
           "id": "catalogUri",
           "label": "Catalog URI",
           "type": "uri",
@@ -552,6 +628,32 @@
           "label": "Warehouse path",
           "type": "string",
           "option": "warehouse"
+        },
+        {
+          "id": "tableIdentifier",
+          "label": "Table identifier",
+          "type": "string",
+          "option": "tableIdentifier"
+        },
+        {
+          "id": "storageBackend",
+          "label": "Storage backend",
+          "type": "string",
+          "option": "storageBackend",
+          "default": "objectStorage"
+        },
+        {
+          "id": "region",
+          "label": "Cloud region",
+          "type": "string",
+          "option": "region"
+        },
+        {
+          "id": "credentialVending",
+          "label": "Credential vending",
+          "type": "boolean",
+          "option": "credentialVending",
+          "default": false
         }
       ]
     },
@@ -576,6 +678,14 @@
         "profileField": "user"
       },
       {
+        "id": "catalogType",
+        "label": "Catalog type",
+        "type": "string",
+        "option": "catalogType",
+        "default": "rest",
+        "required": true
+      },
+      {
         "id": "catalogUri",
         "label": "Catalog URI",
         "type": "uri",
@@ -586,6 +696,32 @@
         "label": "Warehouse path",
         "type": "string",
         "option": "warehouse"
+      },
+      {
+        "id": "tableIdentifier",
+        "label": "Table identifier",
+        "type": "string",
+        "option": "tableIdentifier"
+      },
+      {
+        "id": "storageBackend",
+        "label": "Storage backend",
+        "type": "string",
+        "option": "storageBackend",
+        "default": "objectStorage"
+      },
+      {
+        "id": "region",
+        "label": "Cloud region",
+        "type": "string",
+        "option": "region"
+      },
+      {
+        "id": "credentialVending",
+        "label": "Credential vending",
+        "type": "boolean",
+        "option": "credentialVending",
+        "default": false
       },
       {
         "id": "readOnly",

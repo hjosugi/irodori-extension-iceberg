@@ -4,7 +4,19 @@ version = "0.1.0"
 edition = "2021"
 license = "MIT OR 0BSD"
 description = "Irodori Table native connector extension."
-publish = false
+repository = "https://github.com/hjosugi/irodori-extension-iceberg"
+readme = "README.md"
+include = [
+  "Cargo.toml",
+  "Cargo.lock",
+  "README.md",
+  "LICENSE-*",
+  "connector.config.json",
+  "connector.source.json",
+  "irodori.extension.json",
+  "src/**",
+  "native/source/**",
+]
 
 [lib]
 name = "irodori_extension_iceberg"
