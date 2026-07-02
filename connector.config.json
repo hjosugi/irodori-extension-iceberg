@@ -490,9 +490,13 @@
       "health",
       "describe",
       "manifest",
-      "config"
+      "config",
+      "connect",
+      "query",
+      "metadata",
+      "close"
     ],
-    "driverLinked": false
+    "driverLinked": true
   },
   "source": {
     "marketplaceId": "irodori.iceberg",

@@ -1,16 +1,16 @@
 //! Native connector ABI for Iceberg.
 //!
 //! Generated extension entrypoints stay small: `abi` owns buffer/JSON ABI
-//! mechanics, and `stub` owns connector behavior.
+//! mechanics, and `driver` owns connector behavior.
 
 mod abi;
-mod stub;
+mod driver;
 
 pub use abi::IrodoriConnectorBuffer;
 
 pub const ABI_VERSION: u32 = 1;
 pub const ENGINE: &str = "iceberg";
-pub const DRIVER_LINKED: bool = false;
+pub const DRIVER_LINKED: bool = true;
 pub const CONFIG_JSON: &str = include_str!("../connector.config.json");
 pub const MANIFEST_JSON: &str = include_str!("../irodori.extension.json");
 
@@ -38,7 +38,7 @@ pub extern "C" fn irodori_connector_config_json() -> IrodoriConnectorBuffer {
 pub extern "C" fn irodori_connector_call_json(
     request: IrodoriConnectorBuffer,
 ) -> IrodoriConnectorBuffer {
-    stub::call_json(request)
+    driver::call_json(request)
 }
 
 #[no_mangle]
@@ -94,7 +94,7 @@ mod tests {
         assert_eq!(connector["engine"], config["connector"]["engine"]);
         assert_eq!(connector["module"], config["connector"]["module"]);
         assert_eq!(connector["connection"], config["connection"]);
-        assert_eq!(config["runtime"]["driverLinked"], json!(false));
+        assert_eq!(config["runtime"]["driverLinked"], json!(true));
         assert!(config["connection"]["authMethods"]
             .as_array()
             .is_some_and(|methods| !methods.is_empty()));
@@ -125,11 +125,11 @@ mod tests {
         let health = call(r#"{"method":"health"}"#);
         assert_eq!(health["ok"], true);
         assert_eq!(health["engine"], ENGINE);
-        assert_eq!(health["driverLinked"], json!(false));
+        assert_eq!(health["driverLinked"], json!(true));
 
         let describe = call(r#"{"method":"describe"}"#);
         assert_eq!(describe["ok"], true);
-        assert_eq!(describe["driverLinked"], json!(false));
+        assert_eq!(describe["driverLinked"], json!(true));
         assert_eq!(
             describe["manifest"]["id"],
             describe["config"]["extensionId"]
@@ -138,10 +138,10 @@ mod tests {
     }
 
     #[test]
-    fn call_json_rejects_driver_operations_until_linked() {
+    fn call_json_rejects_query_without_connection() {
         let response = call(r#"{"method":"query","sql":"select 1"}"#);
         assert_eq!(response["ok"], false);
-        assert_eq!(response["error"]["code"], "connector.driverNotLinked");
+        assert_eq!(response["error"]["code"], "connector.connectionNotFound");
     }
 
     #[test]
