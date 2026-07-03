@@ -1,9 +1,9 @@
 [package]
 name = "irodori-extension-iceberg"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 license = "MIT OR 0BSD"
-description = "Irodori Table native connector extension."
+description = "Native Irodori Table connector extension for Iceberg."
 repository = "https://github.com/hjosugi/irodori-extension-iceberg"
 readme = "README.md"
 include = [
@@ -23,6 +23,7 @@ name = "irodori_extension_iceberg"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+irodori-connector-abi = { git = "https://github.com/hjosugi/irodori-kit", tag = "v0.6.0" }
 duckdb = { version = "1", default-features = false, features = ["bundled"] }
 serde_json = "1"
 

@@ -3,7 +3,7 @@
   "manifestVersion": 1,
   "id": "irodori.iceberg",
   "name": "Iceberg Connector",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "irodori",
   "description": "Iceberg Connector contributes the Iceberg database connector through the native connector ABI.",
   "license": "MIT OR 0BSD",
@@ -217,6 +217,20 @@
               ]
             },
             {
+              "id": "awsDefaultCredentialsChain",
+              "label": "AWS default credential chain",
+              "kind": "iam",
+              "secretPurposes": [],
+              "fields": [
+                {
+                  "id": "region",
+                  "label": "Region",
+                  "type": "string",
+                  "option": "region"
+                }
+              ]
+            },
+            {
               "id": "awsSigV4",
               "label": "AWS SigV4",
               "kind": "iam",
@@ -266,6 +280,101 @@
                   "label": "Region",
                   "type": "string",
                   "option": "region"
+                }
+              ]
+            },
+            {
+              "id": "awsSso",
+              "label": "AWS IAM Identity Center / SSO",
+              "kind": "iam",
+              "secretPurposes": [
+                "token"
+              ],
+              "fields": [
+                {
+                  "id": "ssoSession",
+                  "label": "SSO session",
+                  "type": "string",
+                  "option": "ssoSession"
+                },
+                {
+                  "id": "region",
+                  "label": "Region",
+                  "type": "string",
+                  "option": "region"
+                }
+              ]
+            },
+            {
+              "id": "webIdentity",
+              "label": "AWS web identity",
+              "kind": "iam",
+              "secretPurposes": [
+                "token"
+              ],
+              "fields": [
+                {
+                  "id": "roleArn",
+                  "label": "Role ARN",
+                  "type": "string",
+                  "option": "roleArn"
+                },
+                {
+                  "id": "webIdentityToken",
+                  "label": "Web identity token",
+                  "type": "secret",
+                  "secretPurpose": "token"
+                }
+              ]
+            },
+            {
+              "id": "awsAssumeRole",
+              "label": "AWS STS assume role",
+              "kind": "iam",
+              "secretPurposes": [
+                "token"
+              ],
+              "fields": [
+                {
+                  "id": "roleArn",
+                  "label": "Role ARN",
+                  "type": "string",
+                  "option": "roleArn",
+                  "required": true
+                },
+                {
+                  "id": "externalId",
+                  "label": "External ID",
+                  "type": "string",
+                  "option": "externalId"
+                },
+                {
+                  "id": "sessionName",
+                  "label": "Session name",
+                  "type": "string",
+                  "option": "sessionName"
+                },
+                {
+                  "id": "region",
+                  "label": "Region",
+                  "type": "string",
+                  "option": "region"
+                }
+              ]
+            },
+            {
+              "id": "sessionToken",
+              "label": "AWS session token",
+              "kind": "token",
+              "secretPurposes": [
+                "token"
+              ],
+              "fields": [
+                {
+                  "id": "token",
+                  "label": "Token",
+                  "type": "secret",
+                  "secretPurpose": "token"
                 }
               ]
             },
@@ -358,6 +467,92 @@
               ]
             },
             {
+              "id": "serviceAccountJwt",
+              "label": "Service account JWT private key",
+              "kind": "privateKey",
+              "secretPurposes": [
+                "privateKey",
+                "privateKeyPassphrase"
+              ],
+              "fields": [
+                {
+                  "id": "user",
+                  "label": "User or client email",
+                  "type": "string",
+                  "profileField": "user"
+                },
+                {
+                  "id": "privateKey",
+                  "label": "Private key",
+                  "type": "pem",
+                  "secretPurpose": "privateKey"
+                },
+                {
+                  "id": "privateKeyPassphrase",
+                  "label": "Private key passphrase",
+                  "type": "secret",
+                  "secretPurpose": "privateKeyPassphrase"
+                }
+              ]
+            },
+            {
+              "id": "serviceAccountImpersonation",
+              "label": "Service account impersonation",
+              "kind": "iam",
+              "secretPurposes": [
+                "token"
+              ],
+              "fields": [
+                {
+                  "id": "targetPrincipal",
+                  "label": "Target service account",
+                  "type": "string",
+                  "option": "targetPrincipal",
+                  "required": true
+                },
+                {
+                  "id": "delegates",
+                  "label": "Delegate chain",
+                  "type": "list",
+                  "option": "delegates"
+                },
+                {
+                  "id": "subjectToken",
+                  "label": "Subject token",
+                  "type": "secret",
+                  "secretPurpose": "token"
+                }
+              ]
+            },
+            {
+              "id": "googleApplicationDefaultCredentials",
+              "label": "Application Default Credentials",
+              "kind": "iam",
+              "secretPurposes": [],
+              "fields": []
+            },
+            {
+              "id": "workloadIdentity",
+              "label": "Workload identity federation",
+              "kind": "iam",
+              "secretPurposes": [
+                "token"
+              ],
+              "fields": [
+                {
+                  "id": "credentialConfig",
+                  "label": "Credential config",
+                  "type": "json"
+                },
+                {
+                  "id": "subjectToken",
+                  "label": "Subject token",
+                  "type": "secret",
+                  "secretPurpose": "token"
+                }
+              ]
+            },
+            {
               "id": "azureAd",
               "label": "Azure AD / Entra ID",
               "kind": "azureAd",
@@ -388,6 +583,80 @@
                   "secretPurpose": "token"
                 }
               ]
+            },
+            {
+              "id": "servicePrincipal",
+              "label": "Service principal",
+              "kind": "oauth2",
+              "secretPurposes": [
+                "token"
+              ],
+              "fields": [
+                {
+                  "id": "clientId",
+                  "label": "Client ID",
+                  "type": "string"
+                },
+                {
+                  "id": "clientSecret",
+                  "label": "Client secret",
+                  "type": "secret",
+                  "secretPurpose": "token"
+                },
+                {
+                  "id": "tenantId",
+                  "label": "Tenant ID",
+                  "type": "string"
+                }
+              ]
+            },
+            {
+              "id": "servicePrincipalCertificate",
+              "label": "Service principal certificate",
+              "kind": "oauth2",
+              "secretPurposes": [
+                "privateKey",
+                "privateKeyPassphrase"
+              ],
+              "fields": [
+                {
+                  "id": "clientId",
+                  "label": "Client ID",
+                  "type": "string",
+                  "required": true
+                },
+                {
+                  "id": "tenantId",
+                  "label": "Tenant ID",
+                  "type": "string",
+                  "required": true
+                },
+                {
+                  "id": "clientCertificate",
+                  "label": "Client certificate",
+                  "type": "pem"
+                },
+                {
+                  "id": "clientPrivateKey",
+                  "label": "Client private key",
+                  "type": "pem",
+                  "secretPurpose": "privateKey",
+                  "required": true
+                },
+                {
+                  "id": "clientPrivateKeyPassphrase",
+                  "label": "Private key passphrase",
+                  "type": "secret",
+                  "secretPurpose": "privateKeyPassphrase"
+                }
+              ]
+            },
+            {
+              "id": "managedIdentity",
+              "label": "Managed identity",
+              "kind": "managedIdentity",
+              "secretPurposes": [],
+              "fields": []
             },
             {
               "id": "sasToken",

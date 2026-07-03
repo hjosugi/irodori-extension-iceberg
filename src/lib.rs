@@ -1,50 +1,19 @@
 //! Native connector ABI for Iceberg.
 //!
-//! Generated extension entrypoints stay small: `abi` owns buffer/JSON ABI
-//! mechanics, and `driver` owns connector behavior.
+//! Generated extension entrypoints stay small: `irodori-connector-abi` owns
+//! buffer/JSON ABI mechanics, and `driver` owns connector behavior.
 
-mod abi;
+pub use irodori_connector_abi as abi;
+
 mod driver;
 
-pub use abi::IrodoriConnectorBuffer;
-
-pub const ABI_VERSION: u32 = 1;
-pub const ENGINE: &str = "iceberg";
-pub const DRIVER_LINKED: bool = true;
-pub const CONFIG_JSON: &str = include_str!("../connector.config.json");
-pub const MANIFEST_JSON: &str = include_str!("../irodori.extension.json");
-
-#[no_mangle]
-pub extern "C" fn irodori_extension_abi_version() -> u32 {
-    ABI_VERSION
-}
-
-#[no_mangle]
-pub extern "C" fn irodori_connector_engine_json() -> IrodoriConnectorBuffer {
-    abi::owned_buffer(ENGINE.to_string())
-}
-
-#[no_mangle]
-pub extern "C" fn irodori_extension_manifest_json() -> IrodoriConnectorBuffer {
-    abi::owned_buffer(MANIFEST_JSON.to_string())
-}
-
-#[no_mangle]
-pub extern "C" fn irodori_connector_config_json() -> IrodoriConnectorBuffer {
-    abi::owned_buffer(CONFIG_JSON.to_string())
-}
-
-#[no_mangle]
-pub extern "C" fn irodori_connector_call_json(
-    request: IrodoriConnectorBuffer,
-) -> IrodoriConnectorBuffer {
-    driver::call_json(request)
-}
-
-#[no_mangle]
-pub extern "C" fn irodori_connector_free_buffer(buffer: IrodoriConnectorBuffer) {
-    abi::free_owned_buffer(buffer);
-}
+irodori_connector_abi::irodori_export_connector!(
+    engine: "iceberg",
+    driver: driver,
+    config: "../connector.config.json",
+    manifest: "../irodori.extension.json",
+    driver_linked: true,
+);
 
 #[cfg(test)]
 mod tests {

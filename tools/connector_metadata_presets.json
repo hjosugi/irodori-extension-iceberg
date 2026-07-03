@@ -223,6 +223,20 @@
         }
       ]
     },
+    "awsDefaultCredentialsChain": {
+      "id": "awsDefaultCredentialsChain",
+      "label": "AWS default credential chain",
+      "kind": "iam",
+      "secretPurposes": [],
+      "fields": [
+        {
+          "id": "region",
+          "label": "Region",
+          "type": "string",
+          "option": "region"
+        }
+      ]
+    },
     "awsSigV4": {
       "id": "awsSigV4",
       "label": "AWS SigV4",
@@ -247,6 +261,41 @@
           "label": "Session token",
           "type": "secret",
           "secretPurpose": "token"
+        },
+        {
+          "id": "region",
+          "label": "Region",
+          "type": "string",
+          "option": "region"
+        }
+      ]
+    },
+    "awsAssumeRole": {
+      "id": "awsAssumeRole",
+      "label": "AWS STS assume role",
+      "kind": "iam",
+      "secretPurposes": [
+        "token"
+      ],
+      "fields": [
+        {
+          "id": "roleArn",
+          "label": "Role ARN",
+          "type": "string",
+          "option": "roleArn",
+          "required": true
+        },
+        {
+          "id": "externalId",
+          "label": "External ID",
+          "type": "string",
+          "option": "externalId"
+        },
+        {
+          "id": "sessionName",
+          "label": "Session name",
+          "type": "string",
+          "option": "sessionName"
         },
         {
           "id": "region",
@@ -458,6 +507,35 @@
         }
       ]
     },
+    "serviceAccountImpersonation": {
+      "id": "serviceAccountImpersonation",
+      "label": "Service account impersonation",
+      "kind": "iam",
+      "secretPurposes": [
+        "token"
+      ],
+      "fields": [
+        {
+          "id": "targetPrincipal",
+          "label": "Target service account",
+          "type": "string",
+          "option": "targetPrincipal",
+          "required": true
+        },
+        {
+          "id": "delegates",
+          "label": "Delegate chain",
+          "type": "list",
+          "option": "delegates"
+        },
+        {
+          "id": "subjectToken",
+          "label": "Subject token",
+          "type": "secret",
+          "secretPurpose": "token"
+        }
+      ]
+    },
     "userPassword": {
       "id": "userPassword",
       "label": "User/password",
@@ -657,6 +735,200 @@
         }
       ]
     },
+    "databricksPersonalAccessToken": {
+      "id": "databricksPersonalAccessToken",
+      "label": "Databricks personal access token",
+      "kind": "token",
+      "secretPurposes": [
+        "token"
+      ],
+      "fields": [
+        {
+          "id": "authMech",
+          "label": "AuthMech",
+          "type": "number",
+          "option": "AuthMech",
+          "default": 3,
+          "required": true
+        },
+        {
+          "id": "uid",
+          "label": "UID",
+          "type": "string",
+          "option": "UID",
+          "default": "token",
+          "required": true
+        },
+        {
+          "id": "password",
+          "label": "Personal access token",
+          "type": "secret",
+          "secretPurpose": "token",
+          "profileField": "password",
+          "option": "PWD",
+          "required": true
+        }
+      ]
+    },
+    "databricksOAuthToken": {
+      "id": "databricksOAuthToken",
+      "label": "Databricks OAuth token",
+      "kind": "oauth2",
+      "secretPurposes": [
+        "token"
+      ],
+      "fields": [
+        {
+          "id": "authMech",
+          "label": "AuthMech",
+          "type": "number",
+          "option": "AuthMech",
+          "default": 11,
+          "required": true
+        },
+        {
+          "id": "authFlow",
+          "label": "Auth flow",
+          "type": "number",
+          "option": "Auth_Flow",
+          "default": 0,
+          "required": true
+        },
+        {
+          "id": "authAccessToken",
+          "label": "OAuth access token",
+          "type": "secret",
+          "secretPurpose": "token",
+          "option": "Auth_AccessToken",
+          "required": true
+        }
+      ]
+    },
+    "databricksOAuthU2M": {
+      "id": "databricksOAuthU2M",
+      "label": "Databricks OAuth user-to-machine",
+      "kind": "browserSso",
+      "secretPurposes": [
+        "password"
+      ],
+      "fields": [
+        {
+          "id": "authMech",
+          "label": "AuthMech",
+          "type": "number",
+          "option": "AuthMech",
+          "default": 11,
+          "required": true
+        },
+        {
+          "id": "authFlow",
+          "label": "Auth flow",
+          "type": "number",
+          "option": "Auth_Flow",
+          "default": 2,
+          "required": true
+        },
+        {
+          "id": "tokenCachePassPhrase",
+          "label": "Token cache passphrase",
+          "type": "secret",
+          "secretPurpose": "password",
+          "option": "TokenCachePassPhrase",
+          "required": true
+        },
+        {
+          "id": "enableTokenCache",
+          "label": "Enable token cache",
+          "type": "number",
+          "option": "EnableTokenCache",
+          "default": 1
+        }
+      ]
+    },
+    "databricksOAuthM2M": {
+      "id": "databricksOAuthM2M",
+      "label": "Databricks OAuth machine-to-machine",
+      "kind": "oauth2",
+      "secretPurposes": [
+        "token"
+      ],
+      "fields": [
+        {
+          "id": "authMech",
+          "label": "AuthMech",
+          "type": "number",
+          "option": "AuthMech",
+          "default": 11,
+          "required": true
+        },
+        {
+          "id": "authFlow",
+          "label": "Auth flow",
+          "type": "number",
+          "option": "Auth_Flow",
+          "default": 1,
+          "required": true
+        },
+        {
+          "id": "oauth2ClientId",
+          "label": "OAuth client ID",
+          "type": "string",
+          "option": "OAuth2ClientId",
+          "required": true
+        },
+        {
+          "id": "oauth2Secret",
+          "label": "OAuth secret",
+          "type": "secret",
+          "secretPurpose": "token",
+          "option": "OAuth2Secret",
+          "required": true
+        },
+        {
+          "id": "azureTenantId",
+          "label": "Azure tenant ID",
+          "type": "string",
+          "option": "AzureTenantId"
+        }
+      ]
+    },
+    "databricksAzureManagedIdentity": {
+      "id": "databricksAzureManagedIdentity",
+      "label": "Databricks Azure managed identity",
+      "kind": "managedIdentity",
+      "secretPurposes": [],
+      "fields": [
+        {
+          "id": "authMech",
+          "label": "AuthMech",
+          "type": "number",
+          "option": "AuthMech",
+          "default": 11,
+          "required": true
+        },
+        {
+          "id": "authFlow",
+          "label": "Auth flow",
+          "type": "number",
+          "option": "Auth_Flow",
+          "default": 3,
+          "required": true
+        },
+        {
+          "id": "azureWorkspaceResourceId",
+          "label": "Azure workspace resource ID",
+          "type": "string",
+          "option": "Azure_workspace_resource_id",
+          "required": true
+        },
+        {
+          "id": "oauth2ClientId",
+          "label": "Managed identity client ID",
+          "type": "string",
+          "option": "OAuth2ClientId"
+        }
+      ]
+    },
     "azureAd": {
       "id": "azureAd",
       "label": "Azure AD / Entra ID",
@@ -712,6 +984,47 @@
           "id": "tenantId",
           "label": "Tenant ID",
           "type": "string"
+        }
+      ]
+    },
+    "servicePrincipalCertificate": {
+      "id": "servicePrincipalCertificate",
+      "label": "Service principal certificate",
+      "kind": "oauth2",
+      "secretPurposes": [
+        "privateKey",
+        "privateKeyPassphrase"
+      ],
+      "fields": [
+        {
+          "id": "clientId",
+          "label": "Client ID",
+          "type": "string",
+          "required": true
+        },
+        {
+          "id": "tenantId",
+          "label": "Tenant ID",
+          "type": "string",
+          "required": true
+        },
+        {
+          "id": "clientCertificate",
+          "label": "Client certificate",
+          "type": "pem"
+        },
+        {
+          "id": "clientPrivateKey",
+          "label": "Client private key",
+          "type": "pem",
+          "secretPurpose": "privateKey",
+          "required": true
+        },
+        {
+          "id": "clientPrivateKeyPassphrase",
+          "label": "Private key passphrase",
+          "type": "secret",
+          "secretPurpose": "privateKeyPassphrase"
         }
       ]
     },
@@ -815,6 +1128,23 @@
           "label": "API key",
           "type": "secret",
           "secretPurpose": "token"
+        }
+      ]
+    },
+    "pineconeApiKey": {
+      "id": "apiKey",
+      "label": "Pinecone API key",
+      "kind": "apiKey",
+      "secretPurposes": [
+        "token"
+      ],
+      "fields": [
+        {
+          "id": "apiKey",
+          "label": "API key",
+          "type": "secret",
+          "secretPurpose": "token",
+          "required": true
         }
       ]
     },
@@ -1128,6 +1458,45 @@
         }
       ]
     },
+    "snowflakeProgrammaticAccessToken": {
+      "id": "snowflakeProgrammaticAccessToken",
+      "label": "Programmatic access token",
+      "kind": "token",
+      "secretPurposes": [
+        "token"
+      ],
+      "fields": [
+        {
+          "id": "token",
+          "label": "Programmatic access token",
+          "type": "secret",
+          "secretPurpose": "token",
+          "required": true
+        }
+      ]
+    },
+    "snowflakeWorkloadIdentity": {
+      "id": "snowflakeWorkloadIdentity",
+      "label": "Workload identity federation",
+      "kind": "iam",
+      "secretPurposes": [
+        "token"
+      ],
+      "fields": [
+        {
+          "id": "issuer",
+          "label": "Issuer",
+          "type": "string",
+          "option": "issuer"
+        },
+        {
+          "id": "subjectToken",
+          "label": "Subject token",
+          "type": "secret",
+          "secretPurpose": "token"
+        }
+      ]
+    },
     "externalBrowser": {
       "id": "externalBrowser",
       "label": "External browser",
@@ -1321,38 +1690,38 @@
       },
       {
         "kind": "portable-connection-contract",
-        "path": "crates/irodori-connection/src/lib.rs",
-        "destination": "native/source/irodori-table/crates/irodori-connection/src/lib.rs"
+        "path": "../irodori-kit/irodori-connection/src/lib.rs",
+        "destination": "native/source/irodori-table/../irodori-kit/irodori-connection/src/lib.rs"
       },
       {
         "kind": "portable-connection-contract",
-        "path": "crates/irodori-connection/src/portable.rs",
-        "destination": "native/source/irodori-table/crates/irodori-connection/src/portable.rs"
+        "path": "../irodori-kit/irodori-connection/src/portable.rs",
+        "destination": "native/source/irodori-table/../irodori-kit/irodori-connection/src/portable.rs"
       },
       {
         "kind": "secure-store-contract",
-        "path": "crates/irodori-secure-store/src/lib.rs",
-        "destination": "native/source/irodori-table/crates/irodori-secure-store/src/lib.rs"
+        "path": "../irodori-kit/irodori-secure-store/src/lib.rs",
+        "destination": "native/source/irodori-table/../irodori-kit/irodori-secure-store/src/lib.rs"
       },
       {
         "kind": "transport-contract",
-        "path": "crates/irodori-core/src/lib.rs",
-        "destination": "native/source/irodori-table/crates/irodori-core/src/lib.rs"
+        "path": "../irodori-kit/irodori-core/src/lib.rs",
+        "destination": "native/source/irodori-table/../irodori-kit/irodori-core/src/lib.rs"
       },
       {
         "kind": "transport-runtime",
-        "path": "crates/irodori-proxy/src/lib.rs",
-        "destination": "native/source/irodori-table/crates/irodori-proxy/src/lib.rs"
+        "path": "../irodori-kit/irodori-proxy/src/lib.rs",
+        "destination": "native/source/irodori-table/../irodori-kit/irodori-proxy/src/lib.rs"
       },
       {
         "kind": "transport-runtime",
-        "path": "crates/irodori-proxy/src/plan.rs",
-        "destination": "native/source/irodori-table/crates/irodori-proxy/src/plan.rs"
+        "path": "../irodori-kit/irodori-proxy/src/plan.rs",
+        "destination": "native/source/irodori-table/../irodori-kit/irodori-proxy/src/plan.rs"
       },
       {
         "kind": "transport-runtime",
-        "path": "crates/irodori-proxy/src/resolved.rs",
-        "destination": "native/source/irodori-table/crates/irodori-proxy/src/resolved.rs"
+        "path": "../irodori-kit/irodori-proxy/src/resolved.rs",
+        "destination": "native/source/irodori-table/../irodori-kit/irodori-proxy/src/resolved.rs"
       }
     ],
     "adapterSnapshot": {

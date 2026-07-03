@@ -25,9 +25,14 @@ Regenerate one extension:
 python3 tools/generate_connector_metadata.py generate irodori-extension-trino-presto
 ```
 
+Regenerate English README files from the generated connector metadata:
+
+```sh
+python3 tools/generate_readmes.py
+```
+
 Recreate presets and source files from the existing generated JSON:
 
 ```sh
 python3 tools/generate_connector_metadata.py bootstrap --write
 ```
-

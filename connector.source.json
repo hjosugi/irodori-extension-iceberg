@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "extensionId": "irodori.iceberg",
   "visibility": "public",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "connector": {
     "id": "iceberg.connector",
     "engine": "iceberg",
@@ -29,65 +29,77 @@
         "connectionString"
       ],
       "defaultPort": 443,
-        "fields": [
-          {
-            "id": "catalogType",
-            "label": "Catalog type",
-            "type": "string",
-            "option": "catalogType",
-            "default": "rest",
-            "required": true
-          },
-          {
-            "id": "catalogUri",
-            "label": "Catalog URI",
-            "type": "uri",
-            "option": "catalogUri"
+      "fields": [
+        {
+          "id": "catalogType",
+          "label": "Catalog type",
+          "type": "string",
+          "option": "catalogType",
+          "default": "rest",
+          "required": true
+        },
+        {
+          "id": "catalogUri",
+          "label": "Catalog URI",
+          "type": "uri",
+          "option": "catalogUri"
         },
         {
           "id": "warehouse",
-            "label": "Warehouse path",
-            "type": "string",
-            "option": "warehouse"
-          },
-          {
-            "id": "tableIdentifier",
-            "label": "Table identifier",
-            "type": "string",
-            "option": "tableIdentifier"
-          },
-          {
-            "id": "storageBackend",
-            "label": "Storage backend",
-            "type": "string",
-            "option": "storageBackend",
-            "default": "objectStorage"
-          },
-          {
-            "id": "region",
-            "label": "Cloud region",
-            "type": "string",
-            "option": "region"
-          },
-          {
-            "id": "credentialVending",
-            "label": "Credential vending",
-            "type": "boolean",
-            "option": "credentialVending",
-            "default": false
-          }
-        ]
-      },
+          "label": "Warehouse path",
+          "type": "string",
+          "option": "warehouse"
+        },
+        {
+          "id": "tableIdentifier",
+          "label": "Table identifier",
+          "type": "string",
+          "option": "tableIdentifier"
+        },
+        {
+          "id": "storageBackend",
+          "label": "Storage backend",
+          "type": "string",
+          "option": "storageBackend",
+          "default": "objectStorage"
+        },
+        {
+          "id": "region",
+          "label": "Cloud region",
+          "type": "string",
+          "option": "region"
+        },
+        {
+          "id": "credentialVending",
+          "label": "Credential vending",
+          "type": "boolean",
+          "option": "credentialVending",
+          "default": false
+        }
+      ]
+    },
     "authMethods": [
       "none",
       "connectionString",
+      "awsDefaultCredentialsChain",
       "awsSigV4",
       "awsProfile",
+      "awsSso",
+      "webIdentity",
+      "awsAssumeRole",
+      "sessionToken",
       "oauth2",
       "catalogBearerToken",
       "catalogPassword",
       "serviceAccountJson",
+      "serviceAccountJwt",
+      "serviceAccountImpersonation",
+      "googleApplicationDefaultCredentials",
+      "workloadIdentity",
       "azureAd",
+      "servicePrincipal",
+      "servicePrincipalCertificate",
+      "managedIdentity",
       "sasToken",
       "customDriverOptions"
     ],
