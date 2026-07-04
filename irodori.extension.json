@@ -3,7 +3,7 @@
   "manifestVersion": 1,
   "id": "irodori.iceberg",
   "name": "Iceberg Connector",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "publisher": "irodori",
   "description": "Iceberg Connector contributes the Iceberg database connector through the native connector ABI.",
   "license": "MIT OR 0BSD",

@@ -1,4 +1,5 @@
 /target
 /.irodori-dev
+dist/*.tar.gz
 dist/native/*
 !dist/native/.gitkeep
