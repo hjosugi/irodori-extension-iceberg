@@ -24,7 +24,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 irodori-connector-abi = { git = "https://github.com/hjosugi/irodori-kit", tag = "v0.6.0" }
-duckdb = { version = "1", default-features = false, features = ["bundled"] }
+duckdb = { version = "1", default-features = false }
 serde_json = "1"
 
 [profile.dev.package."*"]
