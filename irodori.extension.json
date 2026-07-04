@@ -513,7 +513,7 @@
                 {
                   "id": "delegates",
                   "label": "Delegate chain",
-                  "type": "list",
+                  "type": "stringList",
                   "option": "delegates"
                 },
                 {

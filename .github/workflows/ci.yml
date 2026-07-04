@@ -6,7 +6,7 @@ on:
 
 jobs:
   extension:
-    uses: hjosugi/irodori-kit/.github/workflows/extension-ci.yml@v0.6.5
+    uses: hjosugi/irodori-kit/.github/workflows/extension-ci.yml@v0.6.7
     with:
       manifest-root: .
       package-command: make package
