@@ -5,16 +5,9 @@ on:
   pull_request:
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    env:
-      CARGO_BUILD_JOBS: "2"
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
-      - uses: Swatinem/rust-cache@v2
-      - run: cargo fmt --check
-      - run: cargo clippy --all-targets -- -D warnings
-      - run: cargo test
+  extension:
+    uses: hjosugi/irodori-kit/.github/workflows/extension-ci.yml@v0.6.5
+    with:
+      manifest-root: .
+      package-command: make package
+      duckdb-backed: true
