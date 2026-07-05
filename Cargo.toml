@@ -2,7 +2,7 @@
 name = "irodori-extension-iceberg"
 version = "0.1.2"
 edition = "2021"
-license = "MIT OR 0BSD"
+license = "0BSD"
 description = "Native Irodori Table connector extension for Iceberg."
 repository = "https://github.com/hjosugi/irodori-extension-iceberg"
 readme = "README.md"

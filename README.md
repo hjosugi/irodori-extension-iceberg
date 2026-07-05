@@ -93,3 +93,7 @@ make build
 ```
 
 Release packages place platform-specific native artifacts under `dist/native`.
+
+## License
+
+0BSD. You can use, copy, modify, and distribute this project for almost any purpose.
