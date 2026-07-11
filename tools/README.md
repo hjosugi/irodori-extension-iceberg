@@ -1,3 +1,6 @@
+<!-- i18n: language-switcher -->
+[English](README.md) | [日本語](README.ja.md)
+
 # Connector Metadata
 
 `connector.source.json` is the human-editable source of truth for each extension.
