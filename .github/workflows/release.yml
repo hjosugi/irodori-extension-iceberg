@@ -16,7 +16,7 @@ permissions:
 
 jobs:
   extension-release:
-    uses: hjosugi/irodori-kit/.github/workflows/extension-release.yml@v0.6.8
+    uses: hjosugi/irodori-kit/.github/workflows/extension-release.yml@v0.6.9
     with:
       release_tag: ${{ inputs.release_tag || github.ref_name }}
       duckdb_backed: true
