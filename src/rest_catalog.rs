@@ -341,9 +341,19 @@ fn create_table_view(
          select * from iceberg_scan({location})",
         schema_ident = quote_identifier(schema),
         table_ident = quote_identifier(table),
-        location = sql_string(metadata_location),
+        location = sql_string(scan_location(metadata_location)),
     );
     conn.execute_batch(&sql).map_err(|err| err.to_string())
+}
+
+/// Catalogs frequently hand out `file://` URIs for local warehouses; DuckDB
+/// wants plain paths for those. Other schemes (s3://, gs://, ...) pass
+/// through untouched.
+fn scan_location(location: &str) -> &str {
+    location
+        .strip_prefix("file://")
+        .or_else(|| location.strip_prefix("file:"))
+        .unwrap_or(location)
 }
 
 fn quote_identifier(identifier: &str) -> String {
@@ -468,6 +478,22 @@ mod tests {
         assert_eq!(
             normalize_base_uri("http://localhost:8181/catalog/v1"),
             "http://localhost:8181/catalog"
+        );
+    }
+
+    #[test]
+    fn strips_file_scheme_for_duckdb_scans() {
+        assert_eq!(
+            scan_location("file:///wh/t/metadata.json"),
+            "/wh/t/metadata.json"
+        );
+        assert_eq!(
+            scan_location("file:/wh/t/metadata.json"),
+            "/wh/t/metadata.json"
+        );
+        assert_eq!(
+            scan_location("s3://bucket/t/metadata.json"),
+            "s3://bucket/t/metadata.json"
         );
     }
 
