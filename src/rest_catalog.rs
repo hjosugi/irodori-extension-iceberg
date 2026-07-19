@@ -20,13 +20,15 @@ const MAX_TABLES: usize = 500;
 const MAX_PAGES_PER_LIST: usize = 50;
 const HTTP_TIMEOUT: Duration = Duration::from_secs(20);
 
-/// Multi-level namespace separator mandated by the Iceberg REST spec
-/// (0x1F unit separator, percent-encoded in URLs).
+/// Default multi-level namespace separator mandated by the Iceberg REST spec
+/// (0x1F unit separator, percent-encoded in URLs). Catalogs may override it
+/// through the `namespace-separator` config property.
 const NAMESPACE_SEPARATOR: &str = "%1F";
 
 pub(crate) struct RestCatalog {
     base: String,
     prefix: String,
+    namespace_separator: String,
     token: Option<String>,
     warehouse: Option<String>,
     table_filter: Option<(Vec<String>, String)>,
@@ -71,6 +73,7 @@ pub(crate) fn from_request(request: &Value) -> Result<Option<RestCatalog>, Strin
     let mut catalog = RestCatalog {
         base,
         prefix: String::new(),
+        namespace_separator: NAMESPACE_SEPARATOR.to_string(),
         token,
         warehouse,
         table_filter,
@@ -126,6 +129,18 @@ impl RestCatalog {
                 }
             }
         }
+        for source in ["overrides", "defaults"] {
+            if let Some(separator) = config
+                .get(source)
+                .and_then(|section| section.get("namespace-separator"))
+                .and_then(Value::as_str)
+            {
+                if !separator.is_empty() {
+                    self.namespace_separator = separator.to_string();
+                    break;
+                }
+            }
+        }
         Ok(())
     }
 
@@ -166,7 +181,7 @@ impl RestCatalog {
                 Some(levels) => format!(
                     "{}?parent={}",
                     self.v1_url("namespaces"),
-                    encode_namespace(levels)
+                    encode_namespace(levels, &self.namespace_separator)
                 ),
             };
             let pages = self.paged(&base_url, parent.is_some(), "namespaces")?;
@@ -185,7 +200,10 @@ impl RestCatalog {
     }
 
     fn list_tables(&self, namespace: &[String]) -> Result<Vec<String>, String> {
-        let url = format!("namespaces/{}/tables", encode_namespace(namespace));
+        let url = format!(
+            "namespaces/{}/tables",
+            encode_namespace(namespace, &self.namespace_separator)
+        );
         let pages = self.paged(&self.v1_url(&url), false, "identifiers")?;
         Ok(pages
             .into_iter()
@@ -234,7 +252,7 @@ impl RestCatalog {
     ) -> Result<(Option<String>, Vec<Value>), String> {
         let url = self.v1_url(&format!(
             "namespaces/{}/tables/{}",
-            encode_namespace(namespace),
+            encode_namespace(namespace, &self.namespace_separator),
             encode_component(table)
         ));
         let response = self.http_get(&url)?;
@@ -439,12 +457,12 @@ fn type_to_string(iceberg_type: &Value) -> String {
     }
 }
 
-fn encode_namespace(levels: &[String]) -> String {
+fn encode_namespace(levels: &[String], separator: &str) -> String {
     levels
         .iter()
         .map(|level| encode_component(level))
         .collect::<Vec<_>>()
-        .join(NAMESPACE_SEPARATOR)
+        .join(separator)
 }
 
 /// Percent-encodes everything outside the URL-safe unreserved set.
@@ -513,8 +531,12 @@ mod tests {
     #[test]
     fn encodes_namespaces_and_components() {
         assert_eq!(
-            encode_namespace(&["a".to_string(), "b c".to_string()]),
+            encode_namespace(&["a".to_string(), "b c".to_string()], NAMESPACE_SEPARATOR),
             "a%1Fb%20c"
+        );
+        assert_eq!(
+            encode_namespace(&["a".to_string(), "b".to_string()], "%2E"),
+            "a%2Eb"
         );
         assert_eq!(encode_component("a/b?c"), "a%2Fb%3Fc");
     }
