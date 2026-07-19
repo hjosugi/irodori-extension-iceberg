@@ -510,7 +510,9 @@ impl OAuth2Client {
         let endpoint = &self.token_endpoint;
         let body = match agent.post(endpoint).send_form(&form) {
             Ok(response) => response.into_string().map_err(|err| {
-                format!("OAuth2 token request to {endpoint} failed while reading the response: {err}")
+                format!(
+                    "OAuth2 token request to {endpoint} failed while reading the response: {err}"
+                )
             })?,
             Err(ureq::Error::Status(code, response)) => {
                 let body = response.into_string().unwrap_or_default();
@@ -900,7 +902,10 @@ mod tests {
             oauth_error_detail(r#"{"error":"invalid_client","error_description":"bad"}"#),
             ", invalid_client: bad"
         );
-        assert_eq!(oauth_error_detail(r#"{"error":"invalid_client"}"#), ", invalid_client");
+        assert_eq!(
+            oauth_error_detail(r#"{"error":"invalid_client"}"#),
+            ", invalid_client"
+        );
         assert_eq!(oauth_error_detail("credential=oops not json"), "");
         assert_eq!(oauth_error_detail("{}"), "");
     }
