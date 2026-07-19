@@ -401,13 +401,28 @@
                 {
                   "id": "clientId",
                   "label": "Client ID",
-                  "type": "string"
+                  "type": "string",
+                  "option": "oauth2ClientId"
                 },
                 {
                   "id": "clientSecret",
                   "label": "Client secret",
                   "type": "secret",
-                  "secretPurpose": "token"
+                  "secretPurpose": "token",
+                  "profileField": "password"
+                },
+                {
+                  "id": "oauth2ServerUri",
+                  "label": "OAuth2 token endpoint",
+                  "type": "uri",
+                  "option": "oauth2ServerUri"
+                },
+                {
+                  "id": "scope",
+                  "label": "OAuth2 scope",
+                  "type": "string",
+                  "option": "scope",
+                  "default": "catalog"
                 }
               ]
             },

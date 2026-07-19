@@ -558,21 +558,39 @@ fn request_containers(request: &Value) -> Vec<&Value> {
 }
 
 fn redaction_values(request: &Value) -> Vec<String> {
-    let mut values = Vec::new();
+    let mut values: Vec<String> = Vec::new();
+    let mut push = |value: String| {
+        if !value.is_empty() && !values.iter().any(|existing| existing == &value) {
+            values.push(value);
+        }
+    };
     for field in [
         "password",
         "token",
+        "catalogToken",
+        "catalogBearerToken",
+        "bearerToken",
         "accessKeyId",
         "secretAccessKey",
         "s3AccessKeyId",
         "s3SecretAccessKey",
         "sessionToken",
         "s3SessionToken",
+        "oauth2ClientSecret",
+        "clientSecret",
     ] {
         if let Some(value) = option_string(request, &[field]) {
-            if !values.iter().any(|existing| existing == &value) {
-                values.push(value);
+            push(value);
+        }
+    }
+    // The OAuth2 credential is `clientId:clientSecret`; error text may contain
+    // either the combined form or the secret half on its own.
+    for field in ["credential", "oauth2Credential", "catalogCredential"] {
+        if let Some(value) = option_string(request, &[field]) {
+            if let Some((_, secret)) = value.split_once(':') {
+                push(secret.trim().to_string());
             }
+            push(value);
         }
     }
     values
@@ -618,9 +636,181 @@ mod catalog_tests {
     use std::net::TcpListener;
     use std::sync::Arc;
 
+    /// OAuth2 behavior for the mock catalog: the token endpoint issues
+    /// `mock-token-{n}` for the expected client credentials, and every other
+    /// route requires a currently valid issued token (or the optional static
+    /// bearer). Tests revoke tokens to simulate expiry mid-session.
+    #[derive(Default)]
+    struct MockOAuth {
+        client_id: String,
+        client_secret: String,
+        /// A user-supplied bearer accepted alongside issued tokens, so tests
+        /// can prove a static token wins without tripping the auth wall.
+        accept_static: Option<String>,
+        issued: Mutex<Vec<String>>,
+        revoked: Mutex<Vec<String>>,
+        token_request_bodies: Mutex<Vec<String>>,
+    }
+
+    impl MockOAuth {
+        fn new(client_id: &str, client_secret: &str) -> Arc<Self> {
+            Arc::new(Self {
+                client_id: client_id.to_string(),
+                client_secret: client_secret.to_string(),
+                ..Self::default()
+            })
+        }
+
+        fn issued_count(&self) -> usize {
+            self.issued.lock().expect("issued tokens").len()
+        }
+
+        fn revoke_all_tokens(&self) {
+            let issued = self.issued.lock().expect("issued tokens").clone();
+            *self.revoked.lock().expect("revoked tokens") = issued;
+        }
+
+        fn accepts(&self, authorization: Option<&str>) -> bool {
+            let Some(bearer) = authorization.and_then(|value| value.strip_prefix("Bearer ")) else {
+                return false;
+            };
+            if self.accept_static.as_deref() == Some(bearer) {
+                return true;
+            }
+            let issued = self.issued.lock().expect("issued tokens");
+            let revoked = self.revoked.lock().expect("revoked tokens");
+            issued.iter().any(|token| token == bearer)
+                && !revoked.iter().any(|token| token == bearer)
+        }
+
+        /// Handles `POST /v1/oauth/tokens`, form-encoded per RFC 6749.
+        fn token_response(&self, body: &str) -> String {
+            self.token_request_bodies
+                .lock()
+                .expect("token request bodies")
+                .push(body.to_string());
+            let fields: HashMap<String, String> = body
+                .split('&')
+                .filter_map(|pair| pair.split_once('='))
+                .map(|(key, value)| (url_decode(key), url_decode(value)))
+                .collect();
+            let ok = fields.get("grant_type").map(String::as_str) == Some("client_credentials")
+                && fields.get("client_id") == Some(&self.client_id)
+                && fields.get("client_secret") == Some(&self.client_secret);
+            if !ok {
+                return http_response(
+                    "401 Unauthorized",
+                    &json!({
+                        "error": "invalid_client",
+                        "error_description": "unknown client id or bad client secret"
+                    })
+                    .to_string(),
+                );
+            }
+            let mut issued = self.issued.lock().expect("issued tokens");
+            let token = format!("mock-token-{}", issued.len() + 1);
+            issued.push(token.clone());
+            http_response(
+                "200 OK",
+                &json!({
+                    "access_token": token,
+                    "token_type": "bearer",
+                    "expires_in": 3600
+                })
+                .to_string(),
+            )
+        }
+    }
+
+    fn url_decode(value: &str) -> String {
+        let bytes = value.as_bytes();
+        let mut out = Vec::with_capacity(bytes.len());
+        let mut index = 0;
+        while index < bytes.len() {
+            match bytes[index] {
+                b'+' => out.push(b' '),
+                b'%' if index + 2 < bytes.len() => {
+                    let hex = std::str::from_utf8(&bytes[index + 1..index + 3]).unwrap_or("");
+                    match u8::from_str_radix(hex, 16) {
+                        Ok(byte) => {
+                            out.push(byte);
+                            index += 2;
+                        }
+                        Err(_) => out.push(b'%'),
+                    }
+                }
+                byte => out.push(byte),
+            }
+            index += 1;
+        }
+        String::from_utf8_lossy(&out).into_owned()
+    }
+
+    fn http_response(status: &str, body: &str) -> String {
+        format!(
+            "HTTP/1.1 {status}\r\nContent-Type: application/json\r\n\
+             Content-Length: {}\r\nConnection: close\r\n\r\n{body}",
+            body.len()
+        )
+    }
+
+    /// Reads one HTTP request (headers plus a Content-Length body) from the
+    /// stream and returns `(method, path, authorization, body)`.
+    fn read_request(stream: &mut std::net::TcpStream) -> (String, String, Option<String>, String) {
+        let mut data = Vec::new();
+        let mut chunk = [0u8; 4096];
+        let header_end = loop {
+            match stream.read(&mut chunk) {
+                Ok(0) => break None,
+                Ok(read) => {
+                    data.extend_from_slice(&chunk[..read]);
+                    if let Some(position) = data.windows(4).position(|window| window == b"\r\n\r\n")
+                    {
+                        break Some(position + 4);
+                    }
+                }
+                Err(_) => break None,
+            }
+        };
+        let Some(header_end) = header_end else {
+            return (String::new(), String::new(), None, String::new());
+        };
+        let head = String::from_utf8_lossy(&data[..header_end]).into_owned();
+        let mut request_line = head.lines().next().unwrap_or("").split_whitespace();
+        let method = request_line.next().unwrap_or("").to_string();
+        let path = request_line.next().unwrap_or("").to_string();
+        let mut authorization = None;
+        let mut content_length = 0usize;
+        for line in head.lines().skip(1) {
+            let Some((name, value)) = line.split_once(':') else {
+                continue;
+            };
+            match name.to_ascii_lowercase().as_str() {
+                "authorization" => authorization = Some(value.trim().to_string()),
+                "content-length" => content_length = value.trim().parse().unwrap_or(0),
+                _ => {}
+            }
+        }
+        while data.len() < header_end + content_length {
+            match stream.read(&mut chunk) {
+                Ok(0) => break,
+                Ok(read) => data.extend_from_slice(&chunk[..read]),
+                Err(_) => break,
+            }
+        }
+        let body = String::from_utf8_lossy(&data[header_end..]).into_owned();
+        (method, path, authorization, body)
+    }
+
     /// Minimal single-threaded HTTP server that answers GET requests from a
     /// fixed route table. Enough to stand in for an Iceberg REST catalog.
-    fn spawn_catalog(routes: Vec<(&str, Value)>, auth_log: Arc<Mutex<Vec<String>>>) -> String {
+    /// With `oauth` set it also serves the spec's `POST /v1/oauth/tokens`
+    /// endpoint and turns away every request that lacks a valid token.
+    fn spawn_catalog_with_oauth(
+        routes: Vec<(&str, Value)>,
+        auth_log: Arc<Mutex<Vec<String>>>,
+        oauth: Option<Arc<MockOAuth>>,
+    ) -> String {
         let listener = TcpListener::bind("127.0.0.1:0").expect("bind mock catalog");
         let base = format!("http://{}", listener.local_addr().expect("local addr"));
         let routes: Vec<(String, String)> = routes
@@ -630,51 +820,35 @@ mod catalog_tests {
         std::thread::spawn(move || {
             for stream in listener.incoming() {
                 let Ok(mut stream) = stream else { break };
-                let mut data = Vec::new();
-                let mut chunk = [0u8; 4096];
-                loop {
-                    match stream.read(&mut chunk) {
-                        Ok(0) => break,
-                        Ok(read) => {
-                            data.extend_from_slice(&chunk[..read]);
-                            if data.windows(4).any(|window| window == b"\r\n\r\n") {
-                                break;
-                            }
-                        }
-                        Err(_) => break,
+                let (method, path, authorization, body) = read_request(&mut stream);
+                if let Some(value) = &authorization {
+                    if let Ok(mut log) = auth_log.lock() {
+                        log.push(value.clone());
                     }
                 }
-                let text = String::from_utf8_lossy(&data);
-                let path = text
-                    .lines()
-                    .next()
-                    .and_then(|line| line.split_whitespace().nth(1))
-                    .unwrap_or("")
-                    .to_string();
-                for line in text.lines() {
-                    if let Some(value) = line
-                        .strip_prefix("Authorization:")
-                        .or_else(|| line.strip_prefix("authorization:"))
-                    {
-                        if let Ok(mut log) = auth_log.lock() {
-                            log.push(value.trim().to_string());
-                        }
+                let response = match &oauth {
+                    Some(oauth) if method == "POST" && path == "/v1/oauth/tokens" => {
+                        oauth.token_response(&body)
                     }
-                }
-                let response = match routes.iter().find(|(route, _)| *route == path) {
-                    Some((_, body)) => format!(
-                        "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\
-                         Content-Length: {}\r\nConnection: close\r\n\r\n{body}",
-                        body.len()
+                    Some(oauth) if !oauth.accepts(authorization.as_deref()) => http_response(
+                        "401 Unauthorized",
+                        &json!({"error": "not authorized"}).to_string(),
                     ),
-                    None => "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\
-                             Connection: close\r\n\r\n"
-                        .to_string(),
+                    _ => match routes.iter().find(|(route, _)| *route == path) {
+                        Some((_, body)) => http_response("200 OK", body),
+                        None => "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\
+                                 Connection: close\r\n\r\n"
+                            .to_string(),
+                    },
                 };
                 let _ = stream.write_all(response.as_bytes());
             }
         });
         base
+    }
+
+    fn spawn_catalog(routes: Vec<(&str, Value)>, auth_log: Arc<Mutex<Vec<String>>>) -> String {
+        spawn_catalog_with_oauth(routes, auth_log, None)
     }
 
     fn call(request: Value) -> Value {
@@ -798,6 +972,180 @@ mod catalog_tests {
             message.contains("unreachable"),
             "expected an unreachable-catalog message, got: {message}"
         );
+    }
+
+    #[test]
+    fn oauth2_client_credentials_authenticate_catalog_requests() {
+        let auth_log = Arc::new(Mutex::new(Vec::new()));
+        let oauth = MockOAuth::new("client-id", "client-secret");
+        let base = spawn_catalog_with_oauth(
+            catalog_routes(),
+            Arc::clone(&auth_log),
+            Some(Arc::clone(&oauth)),
+        );
+
+        let connect = call(json!({
+            "method": "connect",
+            "connectionId": "oauth-happy-test",
+            "options": {"catalogUri": base, "credential": "client-id:client-secret"}
+        }));
+        assert_eq!(connect["ok"], true, "connect failed: {connect}");
+
+        let metadata = call(json!({
+            "method": "metadata",
+            "connectionId": "oauth-happy-test"
+        }));
+        assert_eq!(metadata["ok"], true, "metadata failed: {metadata}");
+        assert_eq!(metadata["metadata"]["schemas"][0]["name"], "analytics");
+        assert_eq!(
+            metadata["metadata"]["schemas"][0]["objects"][0]["name"],
+            "events"
+        );
+
+        assert_eq!(oauth.issued_count(), 1, "expected a single token request");
+        let bodies = oauth.token_request_bodies.lock().expect("token bodies");
+        assert!(
+            bodies[0].contains("grant_type=client_credentials")
+                && bodies[0].contains("scope=catalog"),
+            "unexpected token request body: {}",
+            bodies[0]
+        );
+        drop(bodies);
+        let seen_auth = auth_log.lock().expect("auth log");
+        assert!(
+            seen_auth.iter().any(|value| value == "Bearer mock-token-1"),
+            "expected the issued token on catalog requests, saw: {seen_auth:?}"
+        );
+        drop(seen_auth);
+
+        call(json!({"method": "close", "connectionId": "oauth-happy-test"}));
+    }
+
+    #[test]
+    fn oauth2_rejects_bad_credentials_without_echoing_them() {
+        let auth_log = Arc::new(Mutex::new(Vec::new()));
+        let oauth = MockOAuth::new("client-id", "client-secret");
+        let base = spawn_catalog_with_oauth(catalog_routes(), auth_log, Some(oauth));
+
+        let connect = call(json!({
+            "method": "connect",
+            "connectionId": "oauth-bad-credential-test",
+            "options": {"catalogUri": base, "credential": "client-id:wrong-secret"}
+        }));
+        assert_eq!(connect["ok"], false, "connect should fail: {connect}");
+        let message = connect["error"]["message"].as_str().unwrap_or_default();
+        assert!(
+            message.contains("OAuth2 token request") && message.contains("invalid_client"),
+            "expected a clear OAuth2 rejection, got: {message}"
+        );
+        assert!(
+            !message.contains("wrong-secret"),
+            "client secret leaked into the error: {message}"
+        );
+    }
+
+    #[test]
+    fn oauth2_missing_client_secret_fails_with_guidance() {
+        let connect = call(json!({
+            "method": "connect",
+            "connectionId": "oauth-no-secret-test",
+            "options": {"catalogUri": "http://127.0.0.1:9", "oauth2ClientId": "client-id"}
+        }));
+        assert_eq!(connect["ok"], false);
+        let message = connect["error"]["message"].as_str().unwrap_or_default();
+        assert!(
+            message.contains("no client secret") && message.contains("password"),
+            "expected guidance toward the password field, got: {message}"
+        );
+    }
+
+    #[test]
+    fn oauth2_refreshes_the_token_once_when_it_expires_mid_session() {
+        let auth_log = Arc::new(Mutex::new(Vec::new()));
+        let oauth = MockOAuth::new("client-id", "client-secret");
+        let base = spawn_catalog_with_oauth(
+            catalog_routes(),
+            Arc::clone(&auth_log),
+            Some(Arc::clone(&oauth)),
+        );
+
+        // The client id arrives via oauth2ClientId and the secret through the
+        // profile's session-only password field — the desktop app's secret
+        // channel — instead of the combined credential option.
+        let connect = call(json!({
+            "method": "connect",
+            "connectionId": "oauth-expiry-test",
+            "password": "client-secret",
+            "options": {"catalogUri": base, "oauth2ClientId": "client-id"}
+        }));
+        assert_eq!(connect["ok"], true, "connect failed: {connect}");
+        assert_eq!(oauth.issued_count(), 1);
+
+        // Simulate token expiry between connect and the metadata sync.
+        oauth.revoke_all_tokens();
+
+        let metadata = call(json!({
+            "method": "metadata",
+            "connectionId": "oauth-expiry-test"
+        }));
+        assert_eq!(
+            metadata["ok"], true,
+            "metadata should succeed after a token refresh: {metadata}"
+        );
+        assert_eq!(metadata["metadata"]["schemas"][0]["name"], "analytics");
+        assert_eq!(
+            oauth.issued_count(),
+            2,
+            "expected exactly one refresh after expiry"
+        );
+        let seen_auth = auth_log.lock().expect("auth log");
+        assert!(
+            seen_auth.iter().any(|value| value == "Bearer mock-token-2"),
+            "expected the refreshed token on catalog requests, saw: {seen_auth:?}"
+        );
+        drop(seen_auth);
+
+        call(json!({"method": "close", "connectionId": "oauth-expiry-test"}));
+    }
+
+    #[test]
+    fn static_bearer_token_takes_precedence_over_oauth2() {
+        let auth_log = Arc::new(Mutex::new(Vec::new()));
+        let oauth = Arc::new(MockOAuth {
+            client_id: "client-id".to_string(),
+            client_secret: "client-secret".to_string(),
+            accept_static: Some("static-token".to_string()),
+            ..MockOAuth::default()
+        });
+        let base = spawn_catalog_with_oauth(
+            catalog_routes(),
+            Arc::clone(&auth_log),
+            Some(Arc::clone(&oauth)),
+        );
+
+        let connect = call(json!({
+            "method": "connect",
+            "connectionId": "oauth-precedence-test",
+            "options": {
+                "catalogUri": base,
+                "catalogToken": "static-token",
+                "credential": "client-id:client-secret"
+            }
+        }));
+        assert_eq!(connect["ok"], true, "connect failed: {connect}");
+        assert_eq!(
+            oauth.issued_count(),
+            0,
+            "static token must skip the OAuth2 token endpoint"
+        );
+        let seen_auth = auth_log.lock().expect("auth log");
+        assert!(
+            seen_auth.iter().any(|value| value == "Bearer static-token"),
+            "expected the static token on the wire, saw: {seen_auth:?}"
+        );
+        drop(seen_auth);
+
+        call(json!({"method": "close", "connectionId": "oauth-precedence-test"}));
     }
 
     #[test]
