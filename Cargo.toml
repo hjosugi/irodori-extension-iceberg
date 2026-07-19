@@ -1,6 +1,6 @@
 [package]
 name = "irodori-extension-iceberg"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 license = "0BSD"
 description = "Native Irodori Table connector extension for Iceberg."

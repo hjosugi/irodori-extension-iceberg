@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "extensionId": "irodori.iceberg",
   "visibility": "public",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "connector": {
     "id": "iceberg.connector",
     "engine": "iceberg",
