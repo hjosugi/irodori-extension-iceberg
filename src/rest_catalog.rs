@@ -8,6 +8,7 @@
 //! current metadata location.
 
 use std::collections::VecDeque;
+use std::sync::Mutex;
 use std::time::Duration;
 
 use serde_json::{json, Value};
@@ -25,13 +26,59 @@ const HTTP_TIMEOUT: Duration = Duration::from_secs(20);
 /// through the `namespace-separator` config property.
 const NAMESPACE_SEPARATOR: &str = "%1F";
 
+/// Default OAuth2 scope for the client credentials flow, per the Iceberg REST
+/// spec's deprecated-but-standard `oauth/tokens` endpoint.
+const DEFAULT_OAUTH2_SCOPE: &str = "catalog";
+
 pub(crate) struct RestCatalog {
     base: String,
     prefix: String,
     namespace_separator: String,
-    token: Option<String>,
+    auth: Auth,
     warehouse: Option<String>,
     table_filter: Option<(Vec<String>, String)>,
+}
+
+/// How catalog requests are authenticated.
+enum Auth {
+    None,
+    /// User-supplied bearer token, sent as-is. Takes precedence over OAuth2
+    /// because it needs no extra round trip and already worked before OAuth2
+    /// support existed.
+    StaticBearer(String),
+    /// OAuth2 client credentials flow (`POST oauth/tokens`): the token is
+    /// fetched at connect and refreshed once whenever the catalog answers 401.
+    OAuth2(OAuth2Client),
+}
+
+struct OAuth2Client {
+    /// Token endpoint. Defaults to `{catalogUri}/v1/oauth/tokens` (the spec's
+    /// catalog-hosted endpoint, which is not under the catalog prefix); an
+    /// explicit `oauth2ServerUri` option or a `oauth2-server-uri` property in
+    /// the catalog's `/v1/config` response overrides it.
+    token_endpoint: String,
+    /// True when the user set `oauth2ServerUri` themselves, in which case the
+    /// catalog config cannot override the endpoint.
+    endpoint_pinned: bool,
+    client_id: Option<String>,
+    client_secret: String,
+    scope: String,
+    access_token: Mutex<Option<String>>,
+}
+
+/// Distinguishes 401 responses (which trigger one OAuth2 token refresh) from
+/// every other HTTP failure.
+enum HttpFailure {
+    Unauthorized(String),
+    Other(String),
+}
+
+impl HttpFailure {
+    fn into_message(self) -> String {
+        match self {
+            HttpFailure::Unauthorized(message) | HttpFailure::Other(message) => message,
+        }
+    }
 }
 
 /// Reads catalog options from the connect request. Returns `Ok(None)` when no
@@ -64,6 +111,13 @@ pub(crate) fn from_request(request: &Value) -> Result<Option<RestCatalog>, Strin
         request,
         &["catalogToken", "catalogBearerToken", "bearerToken", "token"],
     );
+    let auth = match token {
+        Some(token) => Auth::StaticBearer(token),
+        None => match oauth2_from_request(request, &base)? {
+            Some(client) => Auth::OAuth2(client),
+            None => Auth::None,
+        },
+    };
     let warehouse = option_string(request, &["warehouse", "warehousePath"]);
     let table_filter = match option_string(request, &["tableIdentifier"]) {
         Some(identifier) => Some(parse_table_identifier(&identifier)?),
@@ -74,12 +128,106 @@ pub(crate) fn from_request(request: &Value) -> Result<Option<RestCatalog>, Strin
         base,
         prefix: String::new(),
         namespace_separator: NAMESPACE_SEPARATOR.to_string(),
-        token,
+        auth,
         warehouse,
         table_filter,
     };
+    // Fetch the OAuth2 token before /v1/config so connect fails fast with a
+    // credential-shaped message instead of a confusing 401 from the catalog.
+    if let Auth::OAuth2(client) = &catalog.auth {
+        client.fetch_token()?;
+    }
     catalog.fetch_config()?;
     Ok(Some(catalog))
+}
+
+/// Builds the OAuth2 client credentials configuration, if any OAuth2 option is
+/// present. Credential material is resolved in this order:
+///
+/// 1. `credential` option in the spec's `clientId:clientSecret` form (a value
+///    without a colon is a bare client secret, matching Iceberg clients);
+/// 2. `oauth2ClientId` / `oauth2ClientSecret` options;
+/// 3. the profile's `user` / `password` fields — the desktop app keeps
+///    `password` session-only (never persisted), so this is the channel that
+///    keeps the client secret out of saved settings.
+fn oauth2_from_request(request: &Value, base: &str) -> Result<Option<OAuth2Client>, String> {
+    let credential = option_string(
+        request,
+        &["credential", "oauth2Credential", "catalogCredential"],
+    );
+    let client_id_option = option_string(request, &["oauth2ClientId", "clientId"]);
+    let client_secret_option = option_string(request, &["oauth2ClientSecret", "clientSecret"]);
+    let server_uri = option_string(request, &["oauth2ServerUri", "oauthServerUri"]);
+    if credential.is_none()
+        && client_id_option.is_none()
+        && client_secret_option.is_none()
+        && server_uri.is_none()
+    {
+        return Ok(None);
+    }
+
+    let (credential_id, credential_secret) = match &credential {
+        Some(value) => parse_credential(value),
+        None => (None, None),
+    };
+    let client_id = credential_id
+        .or(client_id_option)
+        .or_else(|| option_string(request, &["user"]));
+    let client_secret = credential_secret
+        .or(client_secret_option)
+        .or_else(|| option_string(request, &["password"]));
+    let Some(client_secret) = client_secret else {
+        return Err(
+            "OAuth2 catalog authentication is configured but no client secret was found. \
+             Set the credential option (clientId:clientSecret), or set oauth2ClientId and \
+             put the client secret in the connection password field (which is kept out of \
+             saved settings)."
+                .to_string(),
+        );
+    };
+    let (token_endpoint, endpoint_pinned) = match &server_uri {
+        Some(uri) => (resolve_token_endpoint(base, uri), true),
+        None => (format!("{base}/v1/oauth/tokens"), false),
+    };
+    let scope = option_string(request, &["scope", "oauth2Scope"])
+        .unwrap_or_else(|| DEFAULT_OAUTH2_SCOPE.to_string());
+    Ok(Some(OAuth2Client {
+        token_endpoint,
+        endpoint_pinned,
+        client_id,
+        client_secret,
+        scope,
+        access_token: Mutex::new(None),
+    }))
+}
+
+/// Splits the spec's `credential` form: `clientId:clientSecret`, or a bare
+/// client secret when there is no colon (matching pyiceberg/iceberg-java).
+fn parse_credential(credential: &str) -> (Option<String>, Option<String>) {
+    match credential.split_once(':') {
+        Some((id, secret)) => {
+            let id = id.trim();
+            let secret = secret.trim();
+            (
+                (!id.is_empty()).then(|| id.to_string()),
+                (!secret.is_empty()).then(|| secret.to_string()),
+            )
+        }
+        None => {
+            let secret = credential.trim();
+            (None, (!secret.is_empty()).then(|| secret.to_string()))
+        }
+    }
+}
+
+/// `oauth2ServerUri` may be absolute or a path relative to the catalog base.
+fn resolve_token_endpoint(base: &str, uri: &str) -> String {
+    let uri = uri.trim();
+    if uri.starts_with("http://") || uri.starts_with("https://") {
+        uri.trim_end_matches('/').to_string()
+    } else {
+        format!("{base}/{}", uri.trim_start_matches('/'))
+    }
 }
 
 /// Strips trailing slashes and a trailing `/v1` so users can paste either the
@@ -141,6 +289,24 @@ impl RestCatalog {
                 }
             }
         }
+        // Catalogs may advertise their token endpoint; honor it for future
+        // refreshes unless the user pinned one explicitly.
+        if let Auth::OAuth2(client) = &mut self.auth {
+            if !client.endpoint_pinned {
+                for source in ["overrides", "defaults"] {
+                    if let Some(uri) = config
+                        .get(source)
+                        .and_then(|section| section.get("oauth2-server-uri"))
+                        .and_then(Value::as_str)
+                    {
+                        if !uri.is_empty() {
+                            client.token_endpoint = resolve_token_endpoint(&self.base, uri);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
         Ok(())
     }
 
@@ -152,24 +318,83 @@ impl RestCatalog {
         }
     }
 
+    /// Sends an authenticated GET. When the catalog answers 401 in OAuth2
+    /// mode the token is refreshed once (it may simply have expired) and the
+    /// request retried once; a second 401 fails with a clear message.
     fn http_get(&self, url: &str) -> Result<Value, String> {
+        match self.http_get_once(url) {
+            Err(HttpFailure::Unauthorized(message)) => {
+                let Auth::OAuth2(client) = &self.auth else {
+                    return Err(self.scrub(&message));
+                };
+                client.fetch_token().map_err(|err| {
+                    format!("catalog rejected the OAuth2 token and refreshing it failed: {err}")
+                })?;
+                match self.http_get_once(url) {
+                    Err(HttpFailure::Unauthorized(message)) => Err(format!(
+                        "catalog still rejects requests after refreshing the OAuth2 token \
+                         ({}). Check that the credential grants access to this catalog.",
+                        self.scrub(&message)
+                    )),
+                    other => other.map_err(|failure| self.scrub(&failure.into_message())),
+                }
+            }
+            other => other.map_err(|failure| self.scrub(&failure.into_message())),
+        }
+    }
+
+    fn http_get_once(&self, url: &str) -> Result<Value, HttpFailure> {
         let agent = ureq::AgentBuilder::new().timeout(HTTP_TIMEOUT).build();
         let mut request = agent.get(url);
-        if let Some(token) = &self.token {
+        if let Some(token) = self.bearer_token() {
             request = request.set("Authorization", &format!("Bearer {token}"));
         }
         let body = match request.call() {
-            Ok(response) => response
-                .into_string()
-                .map_err(|err| format!("GET {url} failed while reading the response: {err}"))?,
+            Ok(response) => response.into_string().map_err(|err| {
+                HttpFailure::Other(format!(
+                    "GET {url} failed while reading the response: {err}"
+                ))
+            })?,
             Err(ureq::Error::Status(code, response)) => {
                 let body = response.into_string().unwrap_or_default();
                 let detail: String = body.chars().take(300).collect();
-                return Err(format!("GET {url} returned HTTP {code}: {detail}"));
+                let message = format!("GET {url} returned HTTP {code}: {detail}");
+                return Err(if code == 401 {
+                    HttpFailure::Unauthorized(message)
+                } else {
+                    HttpFailure::Other(message)
+                });
             }
-            Err(err) => return Err(format!("GET {url} failed: {err}")),
+            Err(err) => return Err(HttpFailure::Other(format!("GET {url} failed: {err}"))),
         };
-        serde_json::from_str(&body).map_err(|err| format!("GET {url} returned invalid JSON: {err}"))
+        serde_json::from_str(&body)
+            .map_err(|err| HttpFailure::Other(format!("GET {url} returned invalid JSON: {err}")))
+    }
+
+    fn bearer_token(&self) -> Option<String> {
+        match &self.auth {
+            Auth::None => None,
+            Auth::StaticBearer(token) => Some(token.clone()),
+            Auth::OAuth2(client) => client.current_token(),
+        }
+    }
+
+    /// Removes credential material from a message before it can surface in an
+    /// error. The driver additionally redacts request-derived secrets; this
+    /// covers the fetched access token, which only this module knows.
+    fn scrub(&self, message: &str) -> String {
+        let mut message = message.to_string();
+        match &self.auth {
+            Auth::None => {}
+            Auth::StaticBearer(token) => message = redact_value(&message, token),
+            Auth::OAuth2(client) => {
+                message = redact_value(&message, &client.client_secret);
+                if let Some(token) = client.current_token() {
+                    message = redact_value(&message, &token);
+                }
+            }
+        }
+        message
     }
 
     fn list_namespaces(&self) -> Result<Vec<Vec<String>>, String> {
@@ -265,6 +490,94 @@ impl RestCatalog {
             .map(table_columns)
             .unwrap_or_default();
         Ok((metadata_location, columns))
+    }
+}
+
+impl OAuth2Client {
+    /// Exchanges the client credentials for an access token
+    /// (`grant_type=client_credentials`) and stores it for later requests.
+    /// Error messages never include the client secret or a token.
+    fn fetch_token(&self) -> Result<String, String> {
+        let agent = ureq::AgentBuilder::new().timeout(HTTP_TIMEOUT).build();
+        let mut form: Vec<(&str, &str)> = vec![
+            ("grant_type", "client_credentials"),
+            ("scope", &self.scope),
+            ("client_secret", &self.client_secret),
+        ];
+        if let Some(client_id) = &self.client_id {
+            form.push(("client_id", client_id));
+        }
+        let endpoint = &self.token_endpoint;
+        let body = match agent.post(endpoint).send_form(&form) {
+            Ok(response) => response.into_string().map_err(|err| {
+                format!(
+                    "OAuth2 token request to {endpoint} failed while reading the response: {err}"
+                )
+            })?,
+            Err(ureq::Error::Status(code, response)) => {
+                let body = response.into_string().unwrap_or_default();
+                return Err(format!(
+                    "OAuth2 token request to {endpoint} was rejected (HTTP {code}{}). \
+                     Check the client id, client secret, and scope.",
+                    oauth_error_detail(&body)
+                ));
+            }
+            Err(err) => {
+                return Err(format!(
+                    "OAuth2 token endpoint {endpoint} is unreachable ({err}). \
+                     Check the oauth2ServerUri option or the catalog URI."
+                ))
+            }
+        };
+        let response: Value = serde_json::from_str(&body).map_err(|err| {
+            format!("OAuth2 token response from {endpoint} is not valid JSON: {err}")
+        })?;
+        let token = response
+            .get("access_token")
+            .and_then(Value::as_str)
+            .filter(|token| !token.is_empty())
+            .ok_or_else(|| {
+                format!("OAuth2 token response from {endpoint} did not include an access_token")
+            })?
+            .to_string();
+        if let Ok(mut guard) = self.access_token.lock() {
+            *guard = Some(token.clone());
+        }
+        Ok(token)
+    }
+
+    fn current_token(&self) -> Option<String> {
+        self.access_token
+            .lock()
+            .ok()
+            .and_then(|guard| guard.clone())
+    }
+}
+
+/// Formats the `error`/`error_description` fields of an OAuth2 error response
+/// (RFC 6749 section 5.2) without echoing the raw body.
+fn oauth_error_detail(body: &str) -> String {
+    let Ok(value) = serde_json::from_str::<Value>(body) else {
+        return String::new();
+    };
+    let error = value.get("error").and_then(Value::as_str).unwrap_or("");
+    let description = value
+        .get("error_description")
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    match (error.is_empty(), description.is_empty()) {
+        (true, true) => String::new(),
+        (false, true) => format!(", {error}"),
+        (true, false) => format!(", {description}"),
+        (false, false) => format!(", {error}: {description}"),
+    }
+}
+
+fn redact_value(message: &str, secret: &str) -> String {
+    if secret.is_empty() {
+        message.to_string()
+    } else {
+        message.replace(secret, "****")
     }
 }
 
@@ -539,6 +852,62 @@ mod tests {
             "a%2Eb"
         );
         assert_eq!(encode_component("a/b?c"), "a%2Fb%3Fc");
+    }
+
+    #[test]
+    fn parses_oauth2_credentials() {
+        assert_eq!(
+            parse_credential("client-id:client-secret"),
+            (
+                Some("client-id".to_string()),
+                Some("client-secret".to_string())
+            )
+        );
+        assert_eq!(
+            parse_credential("only-secret"),
+            (None, Some("only-secret".to_string()))
+        );
+        assert_eq!(
+            parse_credential("id-only:"),
+            (Some("id-only".to_string()), None)
+        );
+        assert_eq!(parse_credential(""), (None, None));
+        // Extra colons belong to the secret, matching `split(":", 2)` clients.
+        assert_eq!(
+            parse_credential("id:se:cret"),
+            (Some("id".to_string()), Some("se:cret".to_string()))
+        );
+    }
+
+    #[test]
+    fn resolves_oauth2_token_endpoints() {
+        let base = "https://catalog.example.com";
+        assert_eq!(
+            resolve_token_endpoint(base, "https://auth.example.com/oauth/tokens/"),
+            "https://auth.example.com/oauth/tokens"
+        );
+        assert_eq!(
+            resolve_token_endpoint(base, "/v1/oauth/tokens"),
+            "https://catalog.example.com/v1/oauth/tokens"
+        );
+        assert_eq!(
+            resolve_token_endpoint(base, "v1/oauth/tokens"),
+            "https://catalog.example.com/v1/oauth/tokens"
+        );
+    }
+
+    #[test]
+    fn formats_oauth_error_details_without_echoing_bodies() {
+        assert_eq!(
+            oauth_error_detail(r#"{"error":"invalid_client","error_description":"bad"}"#),
+            ", invalid_client: bad"
+        );
+        assert_eq!(
+            oauth_error_detail(r#"{"error":"invalid_client"}"#),
+            ", invalid_client"
+        );
+        assert_eq!(oauth_error_detail("credential=oops not json"), "");
+        assert_eq!(oauth_error_detail("{}"), "");
     }
 
     #[test]
