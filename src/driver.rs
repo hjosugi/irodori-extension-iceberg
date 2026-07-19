@@ -4,6 +4,7 @@ use std::sync::{Mutex, OnceLock};
 use serde_json::{json, Map, Value};
 
 use crate::abi::{self, IrodoriConnectorBuffer};
+use crate::rest_catalog::{self, RestCatalog};
 use crate::{ABI_VERSION, CONFIG_JSON, DRIVER_LINKED, ENGINE, MANIFEST_JSON};
 
 static CONNECTIONS: OnceLock<Mutex<HashMap<String, LakehouseConnection>>> = OnceLock::new();
@@ -11,6 +12,7 @@ static CONNECTIONS: OnceLock<Mutex<HashMap<String, LakehouseConnection>>> = Once
 struct LakehouseConnection {
     conn: duckdb::Connection,
     redaction_values: Vec<String>,
+    catalog: Option<RestCatalog>,
 }
 
 #[derive(Default)]
@@ -77,8 +79,19 @@ fn connect(request: &Value) -> IrodoriConnectorBuffer {
         Err(err) => return abi::error("connector.connectFailed", format!("connect failed: {err}")),
     };
     let redaction_values = redaction_values(request);
-    if let Err(err) = configure_connection(&conn, request) {
+    if let Err(err) = apply_settings(&conn, request) {
         return abi::error("connector.connectFailed", redact(&redaction_values, &err));
+    }
+    let catalog = match rest_catalog::from_request(request) {
+        Ok(catalog) => catalog,
+        Err(err) => return abi::error("connector.connectFailed", redact(&redaction_values, &err)),
+    };
+    // Catalog mode owns table discovery; the single-path view only applies
+    // when no catalog is configured.
+    if catalog.is_none() {
+        if let Err(err) = configure_connection(&conn, request) {
+            return abi::error("connector.connectFailed", redact(&redaction_values, &err));
+        }
     }
     let server_version = conn
         .query_row("select version()", [], |row| row.get::<_, String>(0))
@@ -97,6 +110,7 @@ fn connect(request: &Value) -> IrodoriConnectorBuffer {
         LakehouseConnection {
             conn,
             redaction_values,
+            catalog,
         },
     );
     abi::ok(Map::from_iter([
@@ -170,6 +184,29 @@ fn metadata(request: &Value) -> IrodoriConnectorBuffer {
             format!("no open connection: {connection_id}"),
         );
     };
+    if let Some(catalog) = &connection.catalog {
+        return match rest_catalog::sync(catalog, &connection.conn) {
+            Ok((metadata, warnings)) => abi::ok(Map::from_iter([
+                ("connectionId".to_string(), Value::String(connection_id)),
+                ("metadata".to_string(), metadata),
+                (
+                    "warnings".to_string(),
+                    Value::Array(
+                        warnings
+                            .into_iter()
+                            .map(|warning| {
+                                Value::String(redact(&connection.redaction_values, &warning))
+                            })
+                            .collect(),
+                    ),
+                ),
+            ])),
+            Err(err) => abi::error(
+                "connector.metadataFailed",
+                redact(&connection.redaction_values, &err),
+            ),
+        };
+    }
     match load_metadata(&connection.conn) {
         Ok(metadata) => abi::ok(Map::from_iter([
             ("connectionId".to_string(), Value::String(connection_id)),
@@ -200,7 +237,6 @@ fn close(request: &Value) -> IrodoriConnectorBuffer {
 }
 
 fn configure_connection(conn: &duckdb::Connection, request: &Value) -> Result<(), String> {
-    apply_settings(conn, request)?;
     let Some(path) = option_string(
         request,
         &[
@@ -268,7 +304,7 @@ fn apply_settings(conn: &duckdb::Connection, request: &Value) -> Result<(), Stri
     Ok(())
 }
 
-fn load_extension(
+pub(crate) fn load_extension(
     conn: &duckdb::Connection,
     extension: &str,
     required: bool,
@@ -476,11 +512,11 @@ fn clean_identifier(value: &str) -> String {
     out
 }
 
-fn sql_string(value: &str) -> String {
+pub(crate) fn sql_string(value: &str) -> String {
     format!("'{}'", value.replace('\'', "''"))
 }
 
-fn option_string(request: &Value, fields: &[&str]) -> Option<String> {
+pub(crate) fn option_string(request: &Value, fields: &[&str]) -> Option<String> {
     request_containers(request)
         .into_iter()
         .find_map(|container| {
@@ -571,6 +607,211 @@ mod tests {
         assert_eq!(
             parquet_pattern("s3://bucket/table"),
             "s3://bucket/table/**/*.parquet"
+        );
+    }
+}
+
+#[cfg(test)]
+mod catalog_tests {
+    use super::*;
+    use std::io::{Read, Write};
+    use std::net::TcpListener;
+    use std::sync::Arc;
+
+    /// Minimal single-threaded HTTP server that answers GET requests from a
+    /// fixed route table. Enough to stand in for an Iceberg REST catalog.
+    fn spawn_catalog(routes: Vec<(&str, Value)>, auth_log: Arc<Mutex<Vec<String>>>) -> String {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind mock catalog");
+        let base = format!("http://{}", listener.local_addr().expect("local addr"));
+        let routes: Vec<(String, String)> = routes
+            .into_iter()
+            .map(|(path, body)| (path.to_string(), body.to_string()))
+            .collect();
+        std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                let Ok(mut stream) = stream else { break };
+                let mut data = Vec::new();
+                let mut chunk = [0u8; 4096];
+                loop {
+                    match stream.read(&mut chunk) {
+                        Ok(0) => break,
+                        Ok(read) => {
+                            data.extend_from_slice(&chunk[..read]);
+                            if data.windows(4).any(|window| window == b"\r\n\r\n") {
+                                break;
+                            }
+                        }
+                        Err(_) => break,
+                    }
+                }
+                let text = String::from_utf8_lossy(&data);
+                let path = text
+                    .lines()
+                    .next()
+                    .and_then(|line| line.split_whitespace().nth(1))
+                    .unwrap_or("")
+                    .to_string();
+                for line in text.lines() {
+                    if let Some(value) = line
+                        .strip_prefix("Authorization:")
+                        .or_else(|| line.strip_prefix("authorization:"))
+                    {
+                        if let Ok(mut log) = auth_log.lock() {
+                            log.push(value.trim().to_string());
+                        }
+                    }
+                }
+                let response = match routes.iter().find(|(route, _)| *route == path) {
+                    Some((_, body)) => format!(
+                        "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\
+                         Content-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                        body.len()
+                    ),
+                    None => "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\
+                             Connection: close\r\n\r\n"
+                        .to_string(),
+                };
+                let _ = stream.write_all(response.as_bytes());
+            }
+        });
+        base
+    }
+
+    fn call(request: Value) -> Value {
+        let payload = request.to_string();
+        let buffer = IrodoriConnectorBuffer {
+            ptr: payload.as_ptr(),
+            len: payload.len(),
+        };
+        let response = call_json(buffer);
+        let bytes = unsafe { std::slice::from_raw_parts(response.ptr, response.len) };
+        let value: Value = serde_json::from_slice(bytes).expect("valid response JSON");
+        abi::free_owned_buffer(response);
+        value
+    }
+
+    fn catalog_routes() -> Vec<(&'static str, Value)> {
+        vec![
+            (
+                "/v1/config",
+                json!({"defaults": {}, "overrides": {"prefix": "demo"}}),
+            ),
+            (
+                "/v1/demo/namespaces",
+                json!({"namespaces": [["analytics"]]}),
+            ),
+            (
+                "/v1/demo/namespaces?parent=analytics",
+                json!({"namespaces": []}),
+            ),
+            (
+                "/v1/demo/namespaces/analytics/tables",
+                json!({"identifiers": [{"namespace": ["analytics"], "name": "events"}]}),
+            ),
+            (
+                "/v1/demo/namespaces/analytics/tables/events",
+                json!({
+                    "metadata-location":
+                        "/nonexistent/irodori-catalog-test/metadata/00000.metadata.json",
+                    "metadata": {
+                        "format-version": 2,
+                        "current-schema-id": 0,
+                        "schemas": [{
+                            "schema-id": 0,
+                            "fields": [
+                                {"id": 1, "name": "id", "required": true, "type": "long"},
+                                {"id": 2, "name": "name", "required": false, "type": "string"}
+                            ]
+                        }]
+                    }
+                }),
+            ),
+        ]
+    }
+
+    #[test]
+    fn catalog_mode_browses_namespaces_and_tables() {
+        let auth_log = Arc::new(Mutex::new(Vec::new()));
+        let base = spawn_catalog(catalog_routes(), Arc::clone(&auth_log));
+
+        let connect = call(json!({
+            "method": "connect",
+            "connectionId": "catalog-browse-test",
+            "options": {"catalogUri": base, "catalogToken": "sekrit"}
+        }));
+        assert_eq!(connect["ok"], true, "connect failed: {connect}");
+
+        let metadata = call(json!({
+            "method": "metadata",
+            "connectionId": "catalog-browse-test"
+        }));
+        assert_eq!(metadata["ok"], true, "metadata failed: {metadata}");
+        let schemas = metadata["metadata"]["schemas"]
+            .as_array()
+            .expect("schemas array");
+        assert_eq!(schemas.len(), 1);
+        assert_eq!(schemas[0]["name"], "analytics");
+        let objects = schemas[0]["objects"].as_array().expect("objects array");
+        assert_eq!(objects.len(), 1);
+        assert_eq!(objects[0]["name"], "events");
+        assert_eq!(objects[0]["kind"], "table");
+        let columns = objects[0]["columns"].as_array().expect("columns array");
+        assert_eq!(columns[0]["name"], "id");
+        assert_eq!(columns[0]["dataType"], "long");
+        assert_eq!(columns[0]["nullable"], false);
+        assert_eq!(columns[1]["name"], "name");
+
+        // The fixture metadata location does not exist, so the view is not
+        // queryable; that must degrade to a warning, not a failure.
+        let warnings = metadata["warnings"].as_array().expect("warnings array");
+        assert!(
+            warnings
+                .iter()
+                .any(|warning| warning.as_str().unwrap_or("").contains("analytics.events")),
+            "expected a warning about analytics.events, got: {warnings:?}"
+        );
+
+        let seen_auth = auth_log.lock().expect("auth log");
+        assert!(
+            seen_auth.iter().any(|value| value == "Bearer sekrit"),
+            "expected bearer token on catalog requests, saw: {seen_auth:?}"
+        );
+        drop(seen_auth);
+
+        call(json!({"method": "close", "connectionId": "catalog-browse-test"}));
+    }
+
+    #[test]
+    fn catalog_connect_fails_fast_when_unreachable() {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+        let base = format!("http://{}", listener.local_addr().expect("local addr"));
+        drop(listener);
+
+        let connect = call(json!({
+            "method": "connect",
+            "connectionId": "catalog-unreachable-test",
+            "options": {"catalogUri": base}
+        }));
+        assert_eq!(connect["ok"], false);
+        let message = connect["error"]["message"].as_str().unwrap_or_default();
+        assert!(
+            message.contains("unreachable"),
+            "expected an unreachable-catalog message, got: {message}"
+        );
+    }
+
+    #[test]
+    fn catalog_rejects_non_rest_catalog_types() {
+        let connect = call(json!({
+            "method": "connect",
+            "connectionId": "catalog-type-test",
+            "options": {"catalogUri": "https://example.com", "catalogType": "glue"}
+        }));
+        assert_eq!(connect["ok"], false);
+        let message = connect["error"]["message"].as_str().unwrap_or_default();
+        assert!(
+            message.contains("only 'rest' catalogs"),
+            "expected unsupported-catalog-type message, got: {message}"
         );
     }
 }

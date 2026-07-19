@@ -26,6 +26,9 @@ crate-type = ["cdylib", "rlib"]
 irodori-connector-abi = { git = "https://github.com/hjosugi/irodori-kit", tag = "v0.6.0" }
 duckdb = { version = "1", default-features = false }
 serde_json = "1"
+# REST catalog client. TLS follows the fleet convention: rustls with the ring
+# provider only (no aws-lc), matching irodori-table#148/#154.
+ureq = { version = "2", default-features = false, features = ["tls"] }
 
 [profile.dev.package."*"]
 debug = 0
