@@ -931,15 +931,15 @@ checksum = "d98f6fed1fde3f8c21bc40a1abb88dd75e67924f9cffc3ef95607bad8017f8e2"
 
 [[package]]
 name = "irodori-connector-abi"
-version = "0.6.0"
-source = "git+https://github.com/hjosugi/irodori-kit?tag=v0.6.0#9050f1b8bed78d8ca9efbd1a699730bce2f35ff3"
+version = "0.7.2"
+source = "git+https://github.com/hjosugi/irodori-kit?tag=v0.7.2#ef4a97db9771fbd6c27de612c33d33e70e2000fb"
 dependencies = [
  "serde_json",
 ]
 
 [[package]]
 name = "irodori-extension-iceberg"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "duckdb",
  "irodori-connector-abi",

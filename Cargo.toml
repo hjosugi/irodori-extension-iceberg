@@ -1,6 +1,7 @@
 [package]
 name = "irodori-extension-iceberg"
-version = "0.3.0"
+version = "0.3.1"
+publish = false
 edition = "2021"
 license = "0BSD"
 description = "Native Irodori Table connector extension for Iceberg."
@@ -23,7 +24,7 @@ name = "irodori_extension_iceberg"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-irodori-connector-abi = { git = "https://github.com/hjosugi/irodori-kit", tag = "v0.6.0" }
+irodori-connector-abi = { git = "https://github.com/hjosugi/irodori-kit", tag = "v0.7.2" }
 duckdb = { version = "1", default-features = false }
 serde_json = "1"
 # REST catalog client. TLS follows the fleet convention: rustls with the ring
